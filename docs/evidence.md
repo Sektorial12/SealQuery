@@ -217,6 +217,12 @@ python3 scripts/verify_query.py \
 - Contract WASM build: passed
 - `./scripts/check_secrets.sh`: passed
 - Result: `CLEAN_CLONE_OK`
+- Real query from the clean clone:
+  - Query ID: `23`
+  - Request transaction: `64HJboSXhy6cb18n45QBFGVEC1B34UY5n1iX7ZoZqP9Y`
+  - OutLayer task ID: `29193`
+  - Attestation verification: `PROVEN task 29193 (execute) 532ce5ebf1dd2e49…e41ba01d`
+  - Final status: `settled`
 
 ## Known limitations
 
