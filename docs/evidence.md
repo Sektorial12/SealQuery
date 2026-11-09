@@ -321,6 +321,27 @@ python3 scripts/verify_query.py \
   - Attestation verification: `PROVEN task 29193 (execute) 532ce5ebf1dd2e49…e41ba01d`
   - Final status: `settled`
 
+## Operations and security validation
+
+- Metrics endpoint `GET /api/metrics`:
+  - Recent queries: 5 (`settled` 4, `refunded` 1); recent success rate `0.8`.
+  - Agent balance after the drill: `750415838565469700000000` yoctoNEAR; contract balance: `7061316963159257100000000` yoctoNEAR.
+  - Alerts: `recent_refunds` (info); no critical alert.
+  - `python3 scripts/monitor.py --once`: exit `0`.
+- State cache and load test:
+  - Cold state read: `4.15 s`.
+  - Warm state read: `0.016 s`.
+  - `python3 scripts/load_test.py --requests 6 --concurrency 3`: 0 errors, min `1.3 ms`, p50 `26.4 ms`, p95 `54.9 ms`, max `57.0 ms`.
+- Incident drill (`DRILL_CONFIRM=1`, `scripts/incident_drill.sh`):
+  - Pause transaction: `9TGfh93yB6RFGQCMMA3RNvuEr9c8haJ7QXMWvkscUKJ6`
+  - Query rejected while paused: `Eep8SArVr9RNCSx6xnHV19ZZhQN2ac7U1VDyK6ZP66AN` (`contract is paused`)
+  - Unpause transaction: `AfLEwDXbZuBKWnazcVKWNq9Sb6okcKUuAAYhiobFmHh8`
+  - Result: `DRILL PASSED`; contract resumed as `paused=false`
+- SLOs and threat model:
+  - SLOs are defined in `docs/operations.md`.
+  - Threat model and privacy review are in `docs/threat-model.md`.
+  - No critical finding in the testnet scope; production gaps are documented.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.
@@ -330,4 +351,8 @@ python3 scripts/verify_query.py \
 - The demo supports two datasets across two owners, one approved computation per dataset, and one configured agent key.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - The demo API keeps idempotency and rate-limit state in memory in a single process.
+- No central secret manager, on-call routing, or production dashboards are implemented.
+- Paid concurrent-query load and a full OutLayer outage simulation are not run.
+- Query transaction links for API-executed queries are persisted locally in `data/query_tx.json`.
+- The UI uses the server-side demo agent; a human wallet connection is deferred.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.

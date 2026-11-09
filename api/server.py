@@ -10,6 +10,7 @@ import pathlib
 import sys
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
@@ -25,6 +26,7 @@ AGENT = os.environ["AGENT_ACCOUNT"]
 API_KEY = os.environ.get("SEALQUERY_API_KEY")
 RATE_LIMIT = int(os.environ.get("SEALQUERY_RATE_LIMIT_PER_MINUTE", "5"))
 IDEMPOTENCY_TTL = int(os.environ.get("SEALQUERY_IDEMPOTENCY_TTL_SECONDS", "86400"))
+STATE_TTL = float(os.environ.get("SEALQUERY_STATE_TTL_SECONDS", "5"))
 DATASETS = json.loads(
     os.environ.get(
         "DEMO_DATASETS",
@@ -57,6 +59,15 @@ def load_query_tx() -> dict[int, dict]:
 
 
 _query_tx: dict[int, dict] = load_query_tx()
+_snapshot_lock = threading.Lock()
+_cache_lock = threading.Lock()
+_snapshot_cache: tuple[float, dict | None] = (0.0, None)
+
+
+def invalidate_snapshot() -> None:
+    global _snapshot_cache
+    with _cache_lock:
+        _snapshot_cache = (0.0, None)
 
 
 def save_query_tx() -> None:
@@ -67,27 +78,32 @@ def save_query_tx() -> None:
 
 
 def account_balance(account_id: str) -> str | None:
-    try:
-        import requests
+    import requests
 
-        response = requests.post(
-            agent_client.RPC_URL,
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "query",
-                "params": {
-                    "request_type": "view_account",
-                    "finality": "final",
-                    "account_id": account_id,
+    for attempt in range(3):
+        try:
+            response = requests.post(
+                agent_client.RPC_URL,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "query",
+                    "params": {
+                        "request_type": "view_account",
+                        "finality": "final",
+                        "account_id": account_id,
+                    },
                 },
-            },
-            timeout=15,
-        )
-        response.raise_for_status()
-        return response.json()["result"]["amount"]
-    except Exception:
-        return None
+                timeout=15,
+            )
+            if response.status_code == 429 or 500 <= response.status_code < 600:
+                time.sleep(0.5 * (2**attempt))
+                continue
+            response.raise_for_status()
+            return response.json()["result"]["amount"]
+        except Exception:
+            time.sleep(0.5 * (2**attempt))
+    return None
 
 
 def dataset_state(dataset_id: str, computation_id: str) -> dict:
@@ -188,6 +204,7 @@ def execute_query(body: dict) -> dict:
             "refund_tx": refund_tx,
         }
     save_query_tx()
+    invalidate_snapshot()
 
     return {
         "ok": True,
@@ -224,8 +241,26 @@ def health():
     )
 
 
-@app.get("/api/state")
-def state():
+def snapshot() -> dict:
+    global _snapshot_cache
+    now = time.time()
+    with _cache_lock:
+        cached_at, cached = _snapshot_cache
+        if cached is not None and now - cached_at < STATE_TTL:
+            return cached
+    with _snapshot_lock:
+        now = time.time()
+        with _cache_lock:
+            cached_at, cached = _snapshot_cache
+            if cached is not None and now - cached_at < STATE_TTL:
+                return cached
+        result = _build_snapshot()
+        with _cache_lock:
+            _snapshot_cache = (time.time(), result)
+        return result
+
+
+def _build_snapshot() -> dict:
     with ThreadPoolExecutor(max_workers=16) as pool:
         paused_future = pool.submit(
             agent_client.rpc_view, CONTRACT, "get_paused", {}
@@ -285,14 +320,129 @@ def state():
                     **tx_by_query.get(query_id, {}),
                 }
             )
+    return {
+        "contract": CONTRACT,
+        "agent": AGENT,
+        "paused": paused,
+        "protocol_fee_bps": protocol_fee_bps,
+        "datasets": datasets,
+        "recent_queries": recent,
+    }
+
+
+@app.get("/api/state")
+def state():
+    return jsonify(snapshot())
+
+
+@app.get("/api/metrics")
+def metrics():
+    snap = snapshot()
+    recent = snap["recent_queries"]
+    statuses = Counter(query.get("status", "unknown") for query in recent)
+    agent_balance = account_balance(AGENT)
+    contract_balance = account_balance(CONTRACT)
+    alerts = []
+
+    if snap["paused"]:
+        alerts.append(
+            {
+                "severity": "critical",
+                "code": "contract_paused",
+                "message": "The contract is paused; new queries are rejected.",
+            }
+        )
+
+    datasets = []
+    for entry in snap["datasets"]:
+        if "error" in entry:
+            alerts.append(
+                {
+                    "severity": "critical",
+                    "code": "dataset_unavailable",
+                    "message": f"{entry['dataset_id']}: {entry['error']}",
+                }
+            )
+            continue
+        used = int(entry["budget"].get("count", 0))
+        limit = int(entry["dataset"].get("budget_per_day", 0))
+        exhausted = limit > 0 and used >= limit
+        datasets.append(
+            {
+                "dataset_id": entry["dataset_id"],
+                "computation_id": entry["computation_id"],
+                "owner": entry["dataset"].get("owner"),
+                "used": used,
+                "limit": limit,
+                "exhausted": exhausted,
+            }
+        )
+        if exhausted:
+            alerts.append(
+                {
+                    "severity": "warning",
+                    "code": "budget_exhausted",
+                    "message": f"{entry['dataset_id']}: daily privacy budget exhausted.",
+                }
+            )
+
+    if statuses.get("failed"):
+        alerts.append(
+            {
+                "severity": "warning",
+                "code": "recent_failed_queries",
+                "message": f"{statuses['failed']} recent query failure(s).",
+            }
+        )
+    if statuses.get("refunded"):
+        alerts.append(
+            {
+                "severity": "info",
+                "code": "recent_refunds",
+                "message": f"{statuses['refunded']} recent query refund(s).",
+            }
+        )
+
+    low_agent = 100_000_000_000_000_000_000_000
+    low_contract = 500_000_000_000_000_000_000_000
+    if agent_balance is not None and int(agent_balance) < low_agent:
+        alerts.append(
+            {
+                "severity": "critical",
+                "code": "low_agent_balance",
+                "message": f"Agent balance below 0.1 NEAR: {agent_balance} yoctoNEAR.",
+            }
+        )
+    if contract_balance is not None and int(contract_balance) < low_contract:
+        alerts.append(
+            {
+                "severity": "warning",
+                "code": "low_contract_balance",
+                "message": f"Contract balance below 0.5 NEAR: {contract_balance} yoctoNEAR.",
+            }
+        )
+
+    total = len(recent)
+    successes = statuses.get("settled", 0) + statuses.get("ready", 0)
     return jsonify(
         {
+            "ok": not any(alert["severity"] == "critical" for alert in alerts),
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "contract": CONTRACT,
             "agent": AGENT,
-            "paused": paused,
-            "protocol_fee_bps": protocol_fee_bps,
+            "paused": snap["paused"],
+            "protocol_fee_bps": snap["protocol_fee_bps"],
+            "queries": {
+                "recent": total,
+                "by_status": dict(statuses),
+                "recent_success_rate": round(successes / total, 4) if total else None,
+            },
             "datasets": datasets,
-            "recent_queries": recent,
+            "balances": {
+                "agent": agent_balance,
+                "contract": contract_balance,
+            },
+            "alerts": alerts,
         }
     )
 

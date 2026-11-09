@@ -51,6 +51,7 @@ docs/                  evidence log
 ## Requirements
 
 - Python 3.11+
+- `curl` and `jq` for the operational scripts
 - Rust 1.99.1 (pinned in `rust-toolchain.toml`)
 - `cargo-near` 0.23.0
 - `near-cli-rs` 0.31.1
@@ -291,6 +292,7 @@ privacy guard rejecting it, and confirms the agent refund.
 API endpoints:
 
 - `GET /api/state` — contract state, datasets, budgets, recent queries
+- `GET /api/metrics` — balances, query status, budgets, and alerts
 - `GET /api/usage` — query history for the configured agent
 - `POST /api/query` — browser-facing demo query
 - `POST /api/v1/query` — machine query; requires `X-API-Key` when configured
@@ -346,6 +348,28 @@ python3 scripts/mcp_smoke_test.py --query
 ```
 
 See `mcp/README.md` for details.
+
+## Operations
+
+```bash
+python3 scripts/monitor.py --once
+python3 scripts/load_test.py --requests 10 --concurrency 3
+```
+
+The incident drill pauses the contract, verifies that a query is rejected, and
+unpauses it:
+
+```bash
+DRILL_CONFIRM=1 \
+CONTRACT_ACCOUNT="$CONTRACT_ACCOUNT" \
+OWNER_ACCOUNT="$OWNER_ACCOUNT" \
+API_URL=http://127.0.0.1:8080 \
+./scripts/incident_drill.sh
+```
+
+See `docs/operations.md` for monitoring thresholds, SLOs, runbooks, key
+rotation, and the incident drill. See `docs/threat-model.md` for the threat
+model and privacy review.
 
 ## Multi-tenant controls
 
@@ -409,6 +433,9 @@ Highlights:
 - MCP query: task `30170`, `PROVEN`, all five MCP tools exercised.
 - Attestation report: all five checks pass, TCB `UpToDate`; saved bundle verifies offline.
 - Rejected-query path: query 8 failed safely and refunded the agent.
+- Monitoring: `/api/metrics` reported no critical alerts; `monitor.py --once` exited `0`.
+- Load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm.
+- Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
 
 ## Known limitations
 
@@ -422,6 +449,7 @@ Highlights:
 - Large results over the NEAR callback limit still need an off-chain delivery path.
 - The demo API is single-process; idempotency and rate-limit state are in memory.
 - Query transaction links for API-executed queries are persisted in `data/query_tx.json`; a production deployment would use a contract-event indexer.
+- Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 
 ## Third-party components
