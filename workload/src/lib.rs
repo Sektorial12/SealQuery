@@ -146,10 +146,7 @@ pub fn upload_dataset_meta(
     }))
 }
 
-pub fn compute_spend_growth(
-    csv_data: &str,
-    params: &SpendGrowthParams,
-) -> Result<Value, String> {
+pub fn compute_spend_growth(csv_data: &str, params: &SpendGrowthParams) -> Result<Value, String> {
     validate_version(&params.version)?;
     let actual_hash = sha256_hex(csv_data.as_bytes());
     if actual_hash != params.expected_sha256 {
@@ -161,7 +158,9 @@ pub fn compute_spend_growth(
 
     let min_cohort = params.min_cohort_size.unwrap_or(MIN_COHORT_DEFAULT);
     if min_cohort < MIN_COHORT_DEFAULT {
-        return Err(format!("min_cohort_size must be at least {MIN_COHORT_DEFAULT}"));
+        return Err(format!(
+            "min_cohort_size must be at least {MIN_COHORT_DEFAULT}"
+        ));
     }
 
     let mut aggregates: HashMap<(String, String), Aggregate> = HashMap::new();

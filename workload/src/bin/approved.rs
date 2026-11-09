@@ -30,10 +30,7 @@ fn main() {
         }),
         "upload_dataset" => {
             require_secret("PROTECTED_DATASET_UPLOAD_TOKEN");
-            let version = request
-                .get("version")
-                .and_then(Value::as_str)
-                .unwrap_or("");
+            let version = request.get("version").and_then(Value::as_str).unwrap_or("");
             if let Err(error) = validate_version(version) {
                 fail(&error);
             }

@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.99.1"
+          target: wasm32-wasip1,wasm32-wasip2,wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Build approved workload
+        run: cargo build -p sealquery-workload --bin sealquery-approved --target wasm32-wasip2 --release --features wasm
+
+      - name: Build contract wasm
+        run: cargo build -p sealquery --target wasm32-unknown-unknown --release
+
+      - name: Secret scan
+        run: ./scripts/check_secrets.sh
+
+  reproducible:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.99.1"
+          target: wasm32-wasip1,wasm32-wasip2,wasm32-unknown-unknown
+
+      - name: Install cargo-near
+        run: |
+          curl -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+
+      - name: Reproducible contract build
+        working-directory: contracts/sealquery
+        run: cargo near build reproducible-wasm --locked --no-abi

@@ -48,10 +48,12 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Computation ID: `spend_growth_v1`
 - Operation: `spend_growth`
 - Dataset version: `retail_v1`
-- Approved workload WASM SHA-256: `0f20f00ce9c9caf451e47e88276901ebe9329e10c15c60e27479da161c2416ba`
-- FastFS URL: `https://test.fastfs.io/sealquery-1794187176.testnet/outlayer.testnet/0f20f00ce9c9caf451e47e88276901ebe9329e10c15c60e27479da161c2416ba.wasm`
-- Upload transaction: `H81GmrP4dGbo1mRL346gRPoyYUDzSGhgZmL146vch83Y`
-- Local unit tests: 5 passed (growth, hash mismatch, disallowed country, small-cohort suppression, upload metadata)
+- Current approved workload WASM SHA-256: `3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47`
+- Current FastFS URL: `https://test.fastfs.io/sealquery-1794187176.testnet/outlayer.testnet/3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47.wasm`
+- Current upload transaction: `9XvfEPBmQXmkLmiiaG4fDUDeKat7SRabJz3qTaccdWxE`
+- Computation update transaction: `3wqMpjaMHnfU3gJYui6tg1njQuEimBaSQsKdHdgpqrX9`
+- The earlier proof used workload hash `0f20f00c…`; the current source builds to `3b1bc4ea…`.
+- Local unit tests: 8 contract tests and 5 workload tests passed
 - Test command:
   ```bash
   cargo test -p sealquery-workload
@@ -73,7 +75,9 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 ## Contract deployment and registration
 
 - Initial deploy transaction: `EXD8MBqzVQz9toRGCXQrjmurXtfLR7UqzhMCNAhs8wpq`
-- Final code deploy transaction: `CAnxWxYe7hgqGjxQf5Ndw53QKF1FUt61QPysTTeEzbMa`
+- Current code deploy transaction: `9e81TBXJsu7KGrxJezcnt3DBks6VmGp6nQcJkBHe7Pbr`
+- Current contract code SHA-256: `73395cd13ef2ffb311190b4edd673a7eee359d283cfc260d55c8d506627a7edf`
+- Contract version: `0.1.0` (`version()` view)
 - Dataset registration transaction: `FVgTfY7jY6Tc1hQPtk2kS24WnDc6vqxbPaDSvzJaYvQU`
 - Computation registration transaction: `7kV4TwhMKzqR5kKYM38ZxFwxoLasKqYJFrV8trtRCDQM`
 - Economics update transaction: `J2GEPcotbYM6nCfg5AmtvBpuhAHiJCoWECTqB6n1wuZ2`
@@ -115,6 +119,16 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Request transaction: `fZe76tS4V67HmWbZi4cg8AFF1nS2bvnfnyDUz5zjp5v`
 - OutLayer task ID: `29145`
 - Attestation verification: `PROVEN task 29145 (execute) a1425e965a25237d…af2e5e15`
+- Final status: `settled`
+
+### Current-build query after workload update
+
+- Agent: `agent2.sealquery-1794187176.testnet`
+- Query ID: `21`
+- Request transaction: `72zzvaARAAk6y55DcDANG97BMC12wqyHFUbB23Bo2QGX`
+- OutLayer task ID: `29176`
+- Workload hash: `3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47`
+- Attestation verification: `PROVEN task 29176 (execute) e8ef182665618d8a…d5d01625`
 - Final status: `settled`
 
 ### Independent verification command
@@ -172,6 +186,16 @@ python3 scripts/verify_query.py \
 - Direct OutLayer access denied.
 - Repeated-query budget enforced at 20 per agent per dataset per day.
 - Output is rounded: spend to nearest 1,000; growth to 0.1%; cohort reported as `100+` or `suppressed`.
+
+## Reproducible build and CI
+
+- Contract reproducible-build metadata is in `contracts/sealquery/Cargo.toml`.
+- Build image: `sourcescan/cargo-near:0.22.0-rust-1.99.1`
+- Image digest: `sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb`
+- Reproducible build command: `cd contracts/sealquery && cargo near build reproducible-wasm`
+- Reproducible contract hash: pending the first committed build
+- CI: `.github/workflows/ci.yml` runs format, clippy, tests, workload build, contract build, and secret scan.
+- Deploy scripts: `scripts/deploy_contract.sh`, `scripts/deploy_workload.sh`, `scripts/register_computation.sh`.
 
 ## Known limitations
 

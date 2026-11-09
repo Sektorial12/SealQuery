@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::{json, Value};
-use near_sdk::{env, near, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseResult};
+use near_sdk::{env, near, AccountId, Gas, NearToken, PanicOnDefault, Promise};
 
 const OUTLAYER_ACCOUNT: &str = "outlayer.testnet";
 const MAX_QUERIES_PER_DAY: u32 = 20;
@@ -75,6 +75,7 @@ impl SealQuery {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[payable]
     pub fn register_dataset(
         &mut self,
@@ -115,6 +116,7 @@ impl SealQuery {
         ));
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn register_computation(
         &mut self,
         computation_id: String,
@@ -134,7 +136,11 @@ impl SealQuery {
         if dataset.owner != caller {
             env::panic_str("only the dataset owner can register computations");
         }
-        if !dataset.allowed_computations.iter().any(|item| item == &operation) {
+        if !dataset
+            .allowed_computations
+            .iter()
+            .any(|item| item == &operation)
+        {
             env::panic_str("operation is not allowed for this dataset");
         }
         if wasm_hash.len() != 64 {
@@ -182,6 +188,46 @@ impl SealQuery {
         dataset.compute_deposit_yocto = compute_deposit_yocto;
         dataset.reward_yocto = reward_yocto;
         self.datasets.insert(dataset_id, dataset);
+    }
+
+    pub fn version() -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_computation(
+        &mut self,
+        computation_id: String,
+        outlayer_project_id: String,
+        wasm_hash: String,
+        operation: String,
+        version: String,
+        secret_profile: String,
+        secret_account: AccountId,
+    ) {
+        let caller = env::predecessor_account_id();
+        let mut computation = self.computation(&computation_id);
+        let dataset = self.dataset(&computation.dataset_id);
+        if dataset.owner != caller {
+            env::panic_str("only the dataset owner can update computations");
+        }
+        if !dataset
+            .allowed_computations
+            .iter()
+            .any(|item| item == &operation)
+        {
+            env::panic_str("operation is not allowed for this dataset");
+        }
+        if wasm_hash.len() != 64 {
+            env::panic_str("wasm_hash must be 64 hex characters");
+        }
+        computation.outlayer_project_id = outlayer_project_id;
+        computation.wasm_hash = wasm_hash;
+        computation.operation = operation;
+        computation.version = version;
+        computation.secret_profile = secret_profile;
+        computation.secret_account = secret_account;
+        self.computations.insert(computation_id, computation);
     }
 
     pub fn quote(&self, dataset_id: String, computation_id: String) -> Value {
@@ -278,15 +324,11 @@ impl SealQuery {
 
     #[private]
     pub fn on_query_result(&mut self, query_id: u64) {
-        let status = match env::promise_result(0) {
-            PromiseResult::Successful(data) => {
+        let status = match env::promise_result_checked(0, 10_000) {
+            Ok(data) => {
                 let text = String::from_utf8(data).unwrap_or_default();
                 let parsed: Value = near_sdk::serde_json::from_str(&text).unwrap_or(Value::Null);
-                if parsed
-                    .get("ok")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false)
-                {
+                if parsed.get("ok").and_then(Value::as_bool).unwrap_or(false) {
                     if let Some(query) = self.queries.get_mut(&query_id) {
                         query.status = "ready".to_string();
                         query.result = Some(text);
@@ -299,7 +341,7 @@ impl SealQuery {
                     "failed"
                 }
             }
-            _ => {
+            Err(_) => {
                 if let Some(query) = self.queries.get_mut(&query_id) {
                     query.status = "failed".to_string();
                 }
@@ -449,8 +491,167 @@ fn build_input(dataset: &Dataset, computation: &Computation, params: &str) -> Va
         input = json!({});
     }
     let object = input.as_object_mut().unwrap();
-    object.insert("operation".to_string(), json!(computation.operation.clone()));
+    object.insert(
+        "operation".to_string(),
+        json!(computation.operation.clone()),
+    );
     object.insert("version".to_string(), json!(computation.version.clone()));
-    object.insert("expected_sha256".to_string(), json!(dataset.data_hash.clone()));
+    object.insert(
+        "expected_sha256".to_string(),
+        json!(dataset.data_hash.clone()),
+    );
     input
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::test_utils::{get_logs, VMContextBuilder};
+    use near_sdk::testing_env;
+
+    const DATA_HASH: &str = "65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983";
+    const WASM_HASH: &str = "0f20f00ce9c9caf451e47e88276901ebe9329e10c15c60e27479da161c2416ba";
+
+    fn account(id: &str) -> AccountId {
+        id.parse().unwrap()
+    }
+
+    fn setup() -> (SealQuery, AccountId) {
+        let owner = account("owner.testnet");
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner.clone())
+            .build());
+        (SealQuery::new(owner.clone()), owner)
+    }
+
+    fn register_dataset(contract: &mut SealQuery, owner: &AccountId) {
+        contract.register_dataset(
+            "retail_v1".to_string(),
+            DATA_HASH.to_string(),
+            vec!["spend_growth".to_string()],
+            U128(20_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+        );
+        assert_eq!(contract.get_dataset("retail_v1".to_string()).owner, *owner);
+    }
+
+    fn register_computation(contract: &mut SealQuery, owner: &AccountId) {
+        contract.register_computation(
+            "spend_growth_v1".to_string(),
+            "retail_v1".to_string(),
+            "owner.testnet/sealquery-approved".to_string(),
+            WASM_HASH.to_string(),
+            "spend_growth".to_string(),
+            "retail_v1".to_string(),
+            "compute".to_string(),
+            owner.clone(),
+        );
+    }
+
+    #[test]
+    fn registers_dataset_and_emits_event() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        assert!(get_logs()
+            .iter()
+            .any(|log| log.contains("dataset_registered")));
+    }
+
+    #[test]
+    fn quote_returns_dataset_and_computation() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+        let quote = contract.quote("retail_v1".to_string(), "spend_growth_v1".to_string());
+        assert_eq!(quote["dataset_id"], "retail_v1");
+        assert_eq!(quote["computation_id"], "spend_growth_v1");
+    }
+
+    #[test]
+    #[should_panic(expected = "only the dataset owner can register computations")]
+    fn rejects_computation_from_non_owner() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(account("attacker.testnet"))
+            .build());
+        register_computation(&mut contract, &account("attacker.testnet"));
+    }
+
+    #[test]
+    fn updates_dataset_economics_for_owner() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        contract.update_dataset_economics(
+            "retail_v1".to_string(),
+            U128(30_000_000_000_000_000_000_000),
+            U128(12_000_000_000_000_000_000_000),
+            U128(15_000_000_000_000_000_000_000),
+        );
+        let dataset = contract.get_dataset("retail_v1".to_string());
+        assert_eq!(dataset.price_yocto.0, 30_000_000_000_000_000_000_000);
+    }
+
+    #[test]
+    fn build_input_binds_dataset_and_operation() {
+        let (contract, owner) = setup();
+        let mut contract = contract;
+        register_dataset(&mut contract, &owner);
+        let dataset = contract.get_dataset("retail_v1".to_string());
+        let computation = Computation {
+            dataset_id: "retail_v1".to_string(),
+            outlayer_project_id: "owner.testnet/sealquery-approved".to_string(),
+            wasm_hash: WASM_HASH.to_string(),
+            operation: "spend_growth".to_string(),
+            version: "retail_v1".to_string(),
+            secret_profile: "compute".to_string(),
+            secret_account: owner,
+        };
+        let input = build_input(&dataset, &computation, r#"{"period_a":"2011-11"}"#);
+        assert_eq!(input["operation"], "spend_growth");
+        assert_eq!(input["version"], "retail_v1");
+        assert_eq!(input["expected_sha256"], DATA_HASH);
+        assert_eq!(input["period_a"], "2011-11");
+    }
+
+    #[test]
+    #[should_panic(expected = "daily privacy budget exceeded")]
+    fn budget_rejects_after_limit() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        testing_env!(VMContextBuilder::new()
+            .block_timestamp(86_400_000_000_000)
+            .build());
+        for _ in 0..MAX_QUERIES_PER_DAY {
+            contract.charge_budget(&agent, "retail_v1");
+        }
+        contract.charge_budget(&agent, "retail_v1");
+    }
+    #[test]
+    fn version_is_exposed() {
+        assert_eq!(SealQuery::version(), "0.1.0");
+    }
+
+    #[test]
+    fn updates_computation_for_owner() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+        contract.update_computation(
+            "spend_growth_v1".to_string(),
+            "owner.testnet/sealquery-approved-v2".to_string(),
+            "aa".repeat(32),
+            "spend_growth".to_string(),
+            "retail_v1".to_string(),
+            "compute".to_string(),
+            owner,
+        );
+        let computation = contract.get_computation("spend_growth_v1".to_string());
+        assert_eq!(
+            computation.outlayer_project_id,
+            "owner.testnet/sealquery-approved-v2"
+        );
+    }
 }

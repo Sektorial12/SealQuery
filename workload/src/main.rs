@@ -37,9 +37,8 @@ fn fail(message: &str) -> ! {
         "ok": false,
         "error": message,
     });
-    let encoded = serde_json::to_string(&response).unwrap_or_else(|_| {
-        String::from("{\"ok\":false,\"error\":\"encoding failure\"}")
-    });
+    let encoded = serde_json::to_string(&response)
+        .unwrap_or_else(|_| String::from("{\"ok\":false,\"error\":\"encoding failure\"}"));
     let _ = io::stdout().write_all(encoded.as_bytes());
     std::process::exit(1);
 }
