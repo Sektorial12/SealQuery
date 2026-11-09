@@ -1,0 +1,38 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.payment-key
+
+# Rust / WASM builds
+target/
+*.wasm
+!contracts/**/res/*.wasm
+!workload/**/res/*.wasm
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# NEAR local state
+neardev/
+.near-credentials/
+*.testnet.json
+
+# Local agent/tool config
+.opencode/
+opencode.json
+
+# Local notes that must never enter the repo
+*.local.md
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
