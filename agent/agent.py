@@ -155,6 +155,34 @@ def wait_for_result(contract: str, query_id: int, timeout_seconds: int = 90) -> 
     raise TimeoutError(f"query {query_id} did not resolve in {timeout_seconds}s")
 
 
+def verify_attestation_json(
+    tx_hash: str, proof_path: str | None = None
+) -> tuple[bool, dict | str]:
+    command = [
+        "outlayer-verify",
+        "tx",
+        tx_hash,
+        "--network",
+        NEAR_NETWORK,
+        "--api",
+        OUTLAYER_API,
+        "--json",
+    ]
+    if proof_path:
+        command.extend(["--bundle", proof_path])
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
+    output = completed.stdout.strip()
+    try:
+        report = json.loads(output)
+    except json.JSONDecodeError:
+        return False, (completed.stdout + completed.stderr).strip()
+    checks = ["authenticity", "identity", "binding", "input", "output"]
+    proven = completed.returncode == 0 and all(
+        report.get(check, {}).get("verdict") == "pass" for check in checks
+    )
+    return proven, report
+
+
 def verify_attestation(tx_hash: str, proof_path: str | None) -> tuple[bool, str]:
     command = [
         "outlayer-verify",

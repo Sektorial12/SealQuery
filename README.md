@@ -281,7 +281,12 @@ Open `http://127.0.0.1:8080`.
 The UI shows the available datasets, owners, prices, quota usage, and a
 **Run query** button. The server submits the real testnet transaction, waits for
 the TEE result, verifies the attestation with `outlayer-verify`, accepts the
-result, and returns the owner payout delta. No keys are exposed to the browser.
+result, and returns the owner payout delta. It also renders the structured TDX
+report (task ID, TCB status, MRTD, and per-check verdicts) and offers a
+downloadable proof bundle. No keys are exposed to the browser.
+
+A **Test rejected query** button sends a disallowed-country request, shows the
+privacy guard rejecting it, and confirms the agent refund.
 
 API endpoints:
 
@@ -291,6 +296,8 @@ API endpoints:
 - `POST /api/v1/query` — machine query; requires `X-API-Key` when configured
 - `GET /api/v1/query/<id>` — machine query record
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
+- `GET /api/attestation/<tx_hash>` — structured TDX attestation report
+- `GET /api/attestation/<tx_hash>/bundle` — downloadable proof bundle
 - `GET /api/health`
 
 Set `SEALQUERY_API_KEY` before starting the server to require an API key on the
@@ -400,6 +407,8 @@ Highlights:
 - Privacy budget: 20 queries allowed; 21st rejected with `daily privacy budget exceeded`.
 - Authenticated machine query: task `30169`, `PROVEN`, idempotent replay verified.
 - MCP query: task `30170`, `PROVEN`, all five MCP tools exercised.
+- Attestation report: all five checks pass, TCB `UpToDate`; saved bundle verifies offline.
+- Rejected-query path: query 8 failed safely and refunded the agent.
 
 ## Known limitations
 
@@ -412,6 +421,7 @@ Highlights:
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
 - Large results over the NEAR callback limit still need an off-chain delivery path.
 - The demo API is single-process; idempotency and rate-limit state are in memory.
+- Query transaction links for API-executed queries are persisted in `data/query_tx.json`; a production deployment would use a contract-event indexer.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 
 ## Third-party components

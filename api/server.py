@@ -12,7 +12,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -44,6 +44,26 @@ _rate_lock = threading.Lock()
 _rate_events: dict[str, list[float]] = {}
 _idempotency_lock = threading.Lock()
 _idempotency: dict[str, tuple[float, dict]] = {}
+_query_tx_lock = threading.Lock()
+QUERY_TX_PATH = ROOT / "data" / "query_tx.json"
+
+
+def load_query_tx() -> dict[int, dict]:
+    try:
+        raw = json.loads(QUERY_TX_PATH.read_text(encoding="utf-8"))
+        return {int(key): value for key, value in raw.items()}
+    except Exception:
+        return {}
+
+
+_query_tx: dict[int, dict] = load_query_tx()
+
+
+def save_query_tx() -> None:
+    with _query_tx_lock:
+        payload = {str(key): value for key, value in _query_tx.items()}
+    QUERY_TX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    QUERY_TX_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def account_balance(account_id: str) -> str | None:
@@ -161,6 +181,14 @@ def execute_query(body: dict) -> dict:
             "0 NEAR",
         )
 
+    with _query_tx_lock:
+        _query_tx[query_id] = {
+            "tx_hash": tx_hash,
+            "accept_tx": accept_tx,
+            "refund_tx": refund_tx,
+        }
+    save_query_tx()
+
     return {
         "ok": True,
         "dataset_id": dataset_id,
@@ -247,8 +275,16 @@ def state():
                     }
                 )
         recent = []
+        with _query_tx_lock:
+            tx_by_query = dict(_query_tx)
         for query_id, future in recent_futures:
-            recent.append({"query_id": query_id, **future.result()})
+            recent.append(
+                {
+                    "query_id": query_id,
+                    **future.result(),
+                    **tx_by_query.get(query_id, {}),
+                }
+            )
     return jsonify(
         {
             "contract": CONTRACT,
@@ -335,6 +371,41 @@ def machine_query(query_id: int):
 def proof(tx_hash: str):
     proven, output = agent_client.verify_attestation(tx_hash, None)
     return jsonify({"proven": proven, "output": output})
+
+
+@app.get("/api/attestation/<tx_hash>")
+def attestation(tx_hash: str):
+    proven, report = agent_client.verify_attestation_json(tx_hash, None)
+    if isinstance(report, dict):
+        return jsonify({"proven": proven, "attestation": report})
+    return jsonify({"proven": proven, "output": report})
+
+
+@app.get("/api/attestation/<tx_hash>/bundle")
+def attestation_bundle(tx_hash: str):
+    proof_dir = ROOT / "data" / "proofs"
+    proof_dir.mkdir(parents=True, exist_ok=True)
+    proof_path = proof_dir / f"{tx_hash}.json"
+    proven, report = agent_client.verify_attestation_json(
+        tx_hash, str(proof_path)
+    )
+    if not proven or not proof_path.exists():
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "attestation did not produce a proof bundle",
+                    "report": report,
+                }
+            ),
+            502,
+        )
+    return send_file(
+        proof_path,
+        mimetype="application/json",
+        as_attachment=True,
+        download_name=f"sealquery-{tx_hash}.json",
+    )
 
 
 if __name__ == "__main__":

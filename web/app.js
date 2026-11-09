@@ -134,6 +134,7 @@ function renderSelected() {
   `;
   el("budget-pill").textContent = `${budget.count}/${dataset.budget_per_day} today`;
   runButton.disabled = state.data?.paused || state.running;
+  el("run-private").disabled = state.data?.paused || state.running;
 }
 
 function renderHistory() {
@@ -150,11 +151,24 @@ function renderHistory() {
     .forEach((query) => {
       const row = document.createElement("div");
       row.className = "history-row";
+      const txLinks = [
+        query.tx_hash
+          ? `<a href="${explorer(query.tx_hash)}" target="_blank" rel="noreferrer">request</a>`
+          : "",
+        query.accept_tx
+          ? `<a href="${explorer(query.accept_tx)}" target="_blank" rel="noreferrer">accept</a>`
+          : "",
+        query.refund_tx
+          ? `<a href="${explorer(query.refund_tx)}" target="_blank" rel="noreferrer">refund</a>`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
       row.innerHTML = `
         <span class="id">#${query.query_id ?? ""}</span>
         <span>${query.dataset_id} · ${query.computation_id}</span>
         <span class="status ${query.status}">${query.status}</span>
-        <span class="when">block ${query.created_block}</span>
+        <span class="when">block ${query.created_block}${txLinks ? `<br />${txLinks}` : ""}</span>
       `;
       container.appendChild(row);
     });
@@ -166,12 +180,20 @@ function renderResult(data) {
   const result = data.result;
   const rows = result?.results || [];
   const badge = el("proof-badge");
-  badge.textContent = data.proof ? "PROVEN" : data.status === "failed" ? "FAILED" : "NOT PROVEN";
+  const rejected = data.status === "failed";
+  badge.textContent = data.proof
+    ? "PROVEN"
+    : rejected
+      ? "REJECTED · REFUNDED"
+      : "NOT PROVEN";
   badge.className = `pill ${data.proof ? "proof" : "danger"}`;
 
   const summary = el("result-summary");
   summary.innerHTML = "";
-  if (rows.length) {
+  if (rejected) {
+    summary.innerHTML =
+      '<p class="muted">The workload rejected the request. No aggregate was released, and the agent was refunded.</p>';
+  } else if (rows.length) {
     rows.forEach((row) => {
       const stat = document.createElement("div");
       stat.className = "stat";
@@ -217,7 +239,10 @@ function renderResult(data) {
   const items = [
     ["Query", `#${data.query_id}`],
     ["Request tx", data.tx_hash],
-    ["Acceptance tx", data.accept_tx || data.refund_tx || "—"],
+    [
+      data.accept_tx ? "Acceptance tx" : data.refund_tx ? "Refund tx" : "Settlement tx",
+      data.accept_tx || data.refund_tx || "—",
+    ],
     ["Data owner", data.owner],
     ["Owner before", `${near(data.owner_before)} NEAR`],
     ["Owner after", `${near(data.owner_after)} NEAR`],
@@ -241,7 +266,51 @@ function renderResult(data) {
 
   el("proof-output").textContent = data.proof_output || "No attestation output.";
   el("result-title").textContent = `${data.dataset_id || selectedDataset()?.dataset_id || "dataset"} aggregate`;
+  if (!rejected) renderAttestation(data.tx_hash);
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function renderAttestation(txHash) {
+  const container = el("attestation");
+  container.classList.add("hidden");
+  container.innerHTML = "";
+  if (!txHash) return;
+  try {
+    const response = await fetch(`/api/attestation/${txHash}`);
+    const payload = await response.json();
+    if (!response.ok || !payload.attestation) {
+      throw new Error(payload.error || "attestation unavailable");
+    }
+    const report = payload.attestation;
+    const checks = ["authenticity", "identity", "binding", "input", "output"];
+    const rows = checks
+      .map((name) => {
+        const check = report[name] || {};
+        return `<div class="attestation-check ${check.verdict === "pass" ? "pass" : "fail"}">
+          <strong>${name}</strong>
+          <span>${check.verdict || "unknown"}</span>
+          <p>${check.detail || ""}</p>
+        </div>`;
+      })
+      .join("");
+    container.innerHTML = `
+      <div class="attestation-head">
+        <strong>Intel TDX attestation</strong>
+        <span class="pill ${payload.proven ? "proof" : "danger"}">${payload.proven ? "ALL CHECKS PASS" : "NOT PROVEN"}</span>
+      </div>
+      <div class="attestation-grid">${rows}</div>
+      <p class="fineprint">
+        Task ${report.task_id ?? "—"} · type ${report.task_type ?? "—"} ·
+        TCB ${report.tcb_status ?? "—"} ·
+        MRTD <code>${short(report.measurements?.mrtd, 18, 10)}</code>
+      </p>
+      <a class="button ghost-button" href="/api/attestation/${txHash}/bundle">Download proof bundle</a>
+    `;
+    container.classList.remove("hidden");
+  } catch (error) {
+    container.innerHTML = `<p class="muted">Attestation report unavailable: ${String(error)}</p>`;
+    container.classList.remove("hidden");
+  }
 }
 
 async function refresh() {
@@ -264,23 +333,33 @@ async function refresh() {
   }
 }
 
-async function runQuery() {
+async function runQuery(privateTest = false) {
   const entry = selectedDataset();
   if (!entry?.dataset || state.running) return;
   state.running = true;
   el("run").disabled = true;
+  el("run-private").disabled = true;
   clearError();
   resetTimeline();
   step("request", "active");
 
   try {
+    const body = {
+      dataset_id: entry.dataset_id,
+      computation_id: entry.computation_id,
+    };
+    if (privateTest) {
+      body.params = {
+        period_a: "2011-11",
+        period_b: "2011-12",
+        countries: ["Canaryland"],
+        min_cohort_size: 100,
+      };
+    }
     const response = await fetch("/api/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        dataset_id: entry.dataset_id,
-        computation_id: entry.computation_id,
-      }),
+      body: JSON.stringify(body),
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error || "query failed");
@@ -288,12 +367,15 @@ async function runQuery() {
     step("request", "done");
     step("compute", payload.status === "failed" ? "fail" : "done");
     step("verify", payload.proof ? "done" : "fail");
-    step("settle", payload.accept_tx ? "done" : payload.refund_tx ? "done" : null);
+    step(
+      "settle",
+      payload.accept_tx ? "done" : payload.refund_tx ? "done" : null,
+    );
 
     renderResult(payload);
     await refresh();
     if (payload.status === "failed") {
-      showError("The approved computation failed. The agent was refunded.");
+      showError("The privacy guard rejected the request. The agent was refunded.");
     }
   } catch (error) {
     step("compute", "fail");
@@ -301,10 +383,12 @@ async function runQuery() {
   } finally {
     state.running = false;
     el("run").disabled = false;
+    el("run-private").disabled = false;
   }
 }
 
 el("refresh").addEventListener("click", refresh);
-el("run").addEventListener("click", runQuery);
+el("run").addEventListener("click", () => runQuery(false));
+el("run-private").addEventListener("click", () => runQuery(true));
 refresh();
 setInterval(refresh, 30000);

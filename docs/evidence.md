@@ -154,6 +154,21 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   - Proof: `true`
   - Data-owner balance before: `1098217144068062800000000`
   - Data-owner balance after: `1108217144068062800000000`
+- Rejected-query path (UI endpoint, disallowed country):
+  - Query: `8`
+  - Request transaction: `83ZR1a378VZ8wC1YzdokvkGGqMEYnLuMgPM1pGrWcNnW`
+  - Status: `failed`; contract status `refunded`
+  - Refund transaction: `CK6nNxLJF9U8C3nEWD7rYxoFTk7yR1ggbnNZB9pbcHew`
+  - Data-owner balance before/after: `1108217144068062800000000` (unchanged)
+  - Budget after: 7/20 queries for `agent2` on `retail_v1`
+- Attestation explorer for query `6`:
+  - Request transaction: `B5eS1qparbbvut8UEDt3YQ4HYuMxKgc424mJdgjqLLS3`
+  - `GET /api/attestation/<tx>`: `proven: true`
+  - Task: `30170`; type: `execute`; TCB: `UpToDate`
+  - Verdicts: authenticity, identity, binding, input, output all `pass`
+  - MRTD: `7fe60787222bd394cb516abca2435f22f035ab2cc9c0a4b4b3b148e46297f3d931a237b72f359052c6e657d8c1409173`
+  - Proof bundle: `data/proofs/B5eS1qparbbvut8UEDt3YQ4HYuMxKgc424mJdgjqLLS3.json` (33,665 bytes)
+  - Offline check: `outlayer-verify bundle <bundle> --offline --short` returned `PROVEN task 30170 (execute) a133d34367f73895…19be358f`, exit `0`
 - MCP query `6` (`run_query` through `mcp/server.py`):
   - Request transaction: `B5eS1qparbbvut8UEDt3YQ4HYuMxKgc424mJdgjqLLS3`
   - Acceptance transaction: `H3pb1M14SLA6GHCCPcwnhv4VE1M4hb4YT7J47jCYou9e`

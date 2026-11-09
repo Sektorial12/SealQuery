@@ -64,6 +64,7 @@
           </div>
 
           <button id="run" class="button primary" disabled>Run query</button>
+          <button id="run-private" class="button ghost-button" disabled>Test rejected query (refunded)</button>
           <p class="fineprint">
             The configured demo agent pays 0.02–0.03 NEAR, verifies the
             attestation, then settles the data owner.
@@ -103,6 +104,7 @@
         <div id="result-summary" class="summary"></div>
         <div id="result-table"></div>
         <div id="result-meta" class="meta-grid"></div>
+        <div id="attestation" class="attestation hidden"></div>
         <details class="proof-box">
           <summary>Attestation output</summary>
           <pre id="proof-output"></pre>

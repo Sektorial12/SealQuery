@@ -118,6 +118,7 @@ h1 {
   padding: 14px 18px;
 }
 .ghost-button { background: transparent; }
+#run-private { width: 100%; margin-top: 8px; font-size: 12px; }
 
 .pill {
   display: inline-flex;
@@ -264,6 +265,28 @@ td.mono, th.mono { font-family: var(--mono); }
 .meta-item span { color: var(--muted); display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
 .meta-item a, .meta-item code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
 
+.attestation {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  padding: 14px;
+}
+.attestation-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.attestation-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.attestation-check { border: 1px solid var(--line); border-radius: 9px; padding: 9px; background: #0a0f14; }
+.attestation-check strong { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.attestation-check span { display: block; margin-top: 3px; font-family: var(--mono); font-size: 12px; }
+.attestation-check p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; }
+.attestation-check.pass span { color: var(--accent); }
+.attestation-check.fail span { color: var(--danger); }
+.attestation .button { margin-top: 10px; }
+
 .proof-box {
   margin-top: 14px;
   border: 1px solid var(--line);
@@ -289,7 +312,8 @@ td.mono, th.mono { font-family: var(--mono); }
 .history-row .status { font-family: var(--mono); }
 .status.ready, .status.settled { color: var(--accent); }
 .status.failed, .status.refunded { color: var(--danger); }
-.history-row .when { color: var(--muted); text-align: right; }
+.history-row .when { color: var(--muted); text-align: right; line-height: 1.5; }
+.history-row a { color: var(--accent); text-decoration: none; font-size: 11px; }
 
 .privacy { background: linear-gradient(180deg, rgba(110, 242, 200, 0.04), transparent), var(--panel); }
 .privacy-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -315,6 +339,7 @@ footer {
   .privacy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .history-row { grid-template-columns: 56px 1fr 90px; }
   .history-row .when { display: none; }
+  .attestation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 560px) {
