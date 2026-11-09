@@ -75,8 +75,8 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 ## Contract deployment and registration
 
 - Initial deploy transaction: `EXD8MBqzVQz9toRGCXQrjmurXtfLR7UqzhMCNAhs8wpq`
-- Current code deploy transaction: `9e81TBXJsu7KGrxJezcnt3DBks6VmGp6nQcJkBHe7Pbr`
-- Current contract code SHA-256: `73395cd13ef2ffb311190b4edd673a7eee359d283cfc260d55c8d506627a7edf`
+- Current code deploy transaction: `GG7eUiyneH2MNYbPjS3qJ6g3Bd8KovPqB3FjDViTmNfv`
+- Current contract code SHA-256 (reproducible build): `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9`
 - Contract version: `0.1.0` (`version()` view)
 - Dataset registration transaction: `FVgTfY7jY6Tc1hQPtk2kS24WnDc6vqxbPaDSvzJaYvQU`
 - Computation registration transaction: `7kV4TwhMKzqR5kKYM38ZxFwxoLasKqYJFrV8trtRCDQM`
@@ -129,6 +129,16 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - OutLayer task ID: `29176`
 - Workload hash: `3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47`
 - Attestation verification: `PROVEN task 29176 (execute) e8ef182665618d8a…d5d01625`
+- Final status: `settled`
+
+### Reproducible-build query
+
+- Agent: `agent2.sealquery-1794187176.testnet`
+- Query ID: `22`
+- Request transaction: `FoVASC9pAvu4pBkCDs41BPoTRUCExuD4sBTSJ5Nhbse7`
+- OutLayer task ID: `29184`
+- Contract hash: `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9`
+- Attestation verification: `PROVEN task 29184 (execute) d8790b0e0ec9afcf…f133a848`
 - Final status: `settled`
 
 ### Independent verification command
@@ -193,9 +203,20 @@ python3 scripts/verify_query.py \
 - Build image: `sourcescan/cargo-near:0.22.0-rust-1.99.1`
 - Image digest: `sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb`
 - Reproducible build command: `cd contracts/sealquery && cargo near build reproducible-wasm`
-- Reproducible contract hash: pending the first committed build
+- Reproducible contract hash: `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9`
 - CI: `.github/workflows/ci.yml` runs format, clippy, tests, workload build, contract build, and secret scan.
 - Deploy scripts: `scripts/deploy_contract.sh`, `scripts/deploy_workload.sh`, `scripts/register_computation.sh`.
+
+## Clean-clone verification
+
+- Clone: `git clone /home/spektor/code/nearhack/code /tmp/opencode/sealquery-clean`
+- `cargo fmt --all -- --check`: passed
+- `cargo clippy --workspace --all-targets -- -D warnings`: passed
+- `cargo test --workspace`: 8 contract tests and 5 workload tests passed
+- Approved workload WASM build: passed
+- Contract WASM build: passed
+- `./scripts/check_secrets.sh`: passed
+- Result: `CLEAN_CLONE_OK`
 
 ## Known limitations
 
