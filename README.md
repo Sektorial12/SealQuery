@@ -16,10 +16,12 @@ A working NEAR testnet proof with no mocked execution, attestation, access contr
 
 - A real private dataset stored in OutLayer encrypted worker storage.
 - One approved computation running in Intel TDX on OutLayer testnet.
-- A NEAR contract that registers datasets/computations, escrows payment, calls OutLayer, receives the result, and settles to the data owner.
+- A multi-tenant NEAR contract (v2) that registers datasets/computations, escrows payment, calls OutLayer, receives the result, and settles to each dataset owner.
 - An agent client that quotes, pays, waits, verifies the TEE attestation, and accepts the result.
-- A privacy budget of 20 queries per agent per dataset per day, a minimum cohort of 100, output rounding, and a canary row that never appears in results.
-- Negative-path tests for unauthorized computations, unauthorized acceptance, direct OutLayer calls, replay, failed executions, refunds, tampered attestations, and budget exhaustion.
+- A per-dataset privacy budget (20 by default), minimum cohort of 100, output rounding, and a canary row that never appears in results.
+- Multi-tenant controls: multiple owners, dataset versions and rotation, pause, per-dataset pricing/budgets, protocol fees, and query history.
+- Negative-path tests for unauthorized computations, unauthorized acceptance, direct OutLayer calls, replay, failed executions, refunds, tampered attestations, budget exhaustion, and paused contracts.
+- Reproducible contract build, CI, deploy scripts, and clean-clone verification with a real query.
 
 ## How NEAR is used
 
@@ -190,11 +192,13 @@ near contract deploy '<contract>' \
 near contract call-function as-transaction '<contract>' register_dataset \
   json-args '{
     "dataset_id":"retail_v1",
+    "version":"retail_v1",
     "data_hash":"65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983",
     "allowed_computations":["spend_growth"],
     "price_yocto":"20000000000000000000000",
     "compute_deposit_yocto":"10000000000000000000000",
-    "reward_yocto":"10000000000000000000000"
+    "reward_yocto":"10000000000000000000000",
+    "budget_per_day":20
   }' \
   prepaid-gas '100 Tgas' attached-deposit '0 NEAR' \
   sign-as '<data-owner>' network-config testnet sign-with-keychain send
@@ -206,7 +210,6 @@ near contract call-function as-transaction '<contract>' register_computation \
     "outlayer_project_id":"<deployer>/sealquery-approved",
     "wasm_hash":"<approved workload sha256>",
     "operation":"spend_growth",
-    "version":"retail_v1",
     "secret_profile":"compute",
     "secret_account":"<deployer>"
   }' \
@@ -255,6 +258,30 @@ python3 scripts/verify_query.py \
 ```
 
 Expected: the contract query record, the result, and `PROVEN`.
+
+## Multi-tenant controls
+
+```bash
+# Rotate a dataset to a new version and hash
+near contract call-function as-transaction '<contract>' rotate_dataset \
+  json-args '{"dataset_id":"retail_v1","new_version":"retail_v2","new_data_hash":"<new hash>"}' \
+  prepaid-gas '50 Tgas' attached-deposit '0 NEAR' \
+  sign-as '<data-owner>' network-config testnet sign-with-keychain send
+
+# Pause or unpause new queries (contract owner only)
+near contract call-function as-transaction '<contract>' set_paused \
+  json-args '{"paused":true}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' \
+  sign-as '<contract-owner>' network-config testnet sign-with-keychain send
+
+# List datasets, computations, and query history
+near contract call-function as-read-only '<contract>' list_datasets \
+  json-args '{}' network-config testnet now
+near contract call-function as-read-only '<contract>' list_computations \
+  json-args '{}' network-config testnet now
+near contract call-function as-read-only '<contract>' get_queries_for_agent \
+  json-args '{"agent":"<agent>"}' network-config testnet now
+```
 
 ## Payment flow
 

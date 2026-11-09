@@ -1,6 +1,6 @@
 [package]
 name = "sealquery"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 repository = "https://github.com/sealquery/sealquery"

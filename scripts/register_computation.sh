@@ -12,6 +12,8 @@ cd "$(dirname "$0")/.."
 
 NETWORK="${NEAR_NETWORK:-testnet}"
 DATASET_ID="${DATASET_ID:-retail_v1}"
+DATASET_VERSION="${DATASET_VERSION:-retail_v1}"
+BUDGET_PER_DAY="${BUDGET_PER_DAY:-20}"
 COMPUTATION_ID="${COMPUTATION_ID:-spend_growth_v1}"
 OPERATION="${OPERATION:-spend_growth}"
 VERSION="${VERSION:-retail_v1}"
@@ -23,11 +25,13 @@ REWARD_YOCTO="${REWARD_YOCTO:-10000000000000000000000}"
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" register_dataset \
   json-args "{
     \"dataset_id\":\"$DATASET_ID\",
+    \"version\":\"$DATASET_VERSION\",
     \"data_hash\":\"$DATA_HASH\",
     \"allowed_computations\":[\"$OPERATION\"],
     \"price_yocto\":\"$PRICE_YOCTO\",
     \"compute_deposit_yocto\":\"$COMPUTE_DEPOSIT_YOCTO\",
-    \"reward_yocto\":\"$REWARD_YOCTO\"
+    \"reward_yocto\":\"$REWARD_YOCTO\",
+    \"budget_per_day\":$BUDGET_PER_DAY
   }" \
   prepaid-gas '100 Tgas' attached-deposit '0 NEAR' \
   sign-as "$OWNER_ACCOUNT" network-config "$NETWORK" sign-with-keychain send
@@ -39,7 +43,6 @@ near contract call-function as-transaction "$CONTRACT_ACCOUNT" register_computat
     \"outlayer_project_id\":\"$OUTLAYER_PROJECT_ID\",
     \"wasm_hash\":\"$WASM_HASH\",
     \"operation\":\"$OPERATION\",
-    \"version\":\"$VERSION\",
     \"secret_profile\":\"$SECRET_PROFILE\",
     \"secret_account\":\"$SECRET_ACCOUNT\"
   }" \

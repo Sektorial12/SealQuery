@@ -86,6 +86,53 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Data-owner reward: `0.01 NEAR`
 - Daily privacy budget: 20 queries per agent per dataset
 
+## Multi-tenant contract (v2)
+
+- v2 deployer: `sealquery-v2-1794194344.testnet`
+- v2 contract: `contract.sealquery-v2-1794194344.testnet`
+- Contract version: `0.2.0`
+- v2 code SHA-256: `42d9cca2e85cd8c287b39ff72e808ace023d2949ca56cd405518422458443069`
+- Contract account funding transaction: `98B7gLLQRMfBbHMNtzMGz7Gp8wHABVpKscFETXRNvquh`
+- Deploy transaction: `dL3mcj92RyifeLzud5d4WdbxLYvYPQ9Z33kMssKTR4j`
+- Compute secret access locked to v2 contract: transaction `6AiVHiGSwq2tRRw4nYrwQ1N3aGSGYLw7popd45AWHaGw`
+- Dataset `retail_v1`:
+  - Owner: `owner.sealquery-1794187176.testnet`
+  - Version: `retail_v1`
+  - Price: `0.02 NEAR`; reward: `0.01 NEAR`; budget: 20/day
+  - Registration transaction: `AdhM7BcdYq2sEAaFShW3pLAutvnA7AwtbWW8meK7FUF5`
+  - Computation `spend_growth_v1` registration: `6Z1v6ak9Svc5WtohPS5YFPZsVb9bLQB3i34YwgBAg9Pp`
+- Dataset `retail_alt`:
+  - Owner: `owner2.sealquery-v2-1794194344.testnet`
+  - Version: `retail_v1`
+  - Price: `0.03 NEAR`; reward: `0.02 NEAR`; budget: 2/day
+  - Registration transaction: `35n6W3crx1m8WPQTDvLo1sx5Hts7RviGYmYxdJx54qkt`
+  - Computation `spend_growth_alt` registration: `2BWKC1FgdASd2ZiyDWah5fei7SubjamRksHvusFVexza`
+- Query `1` on `retail_v1`:
+  - Agent: `agent2.sealquery-1794187176.testnet`
+  - Request transaction: `9PHos2pKyLaMd1NCWb9N6oXc69omuDMW1DSB4atGPizf`
+  - OutLayer task: `29204`
+  - Attestation: `PROVEN task 29204 (execute) 6be38d736a6a8d54…fa818660`
+  - Status: `settled`
+- Query `2` on `retail_alt`:
+  - Request transaction: `A5CtDSXtbJ1tUwwCmBJvY9yugND3fGZAroJzWFFtLxyG`
+  - OutLayer task: `29205`
+  - Attestation: `PROVEN task 29205 (execute) 5ffaa8843c717f7a…706e1cc2`
+  - Status: `settled`
+  - Data-owner balance before: `499590340385875400000000`
+  - Data-owner balance after: `519590340385875400000000`
+- Pause test:
+  - `set_paused(true)` by contract owner succeeded
+  - Agent query rejected with `contract is paused`
+  - `set_paused(false)` restored service
+- Dataset rotation:
+  - `retail_alt` rotated to `retail_v2`: `7cJBzGaWD4qhzn4Hn8ZrZXAcdDq1VWmBgMt7CxPhnLju`
+  - Rotated back to `retail_v1`: `DETpxobXMMZrLVc2KLbgeWHUb8Nw72vta5HfXE2YB64A`
+- Multi-tenant views:
+  - `list_datasets`: `["retail_alt","retail_v1"]`
+  - `list_computations`: `["spend_growth_alt","spend_growth_v1"]`
+  - `get_queries_for_agent(agent2)`: `[1,2]`
+  - `get_queries_for_dataset(retail_alt)`: `[2]`
+
 ## End-to-end query
 
 ### Manual end-to-end proof
