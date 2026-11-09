@@ -139,10 +139,33 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   - Proof: `true`
   - Data-owner balance before: `1068217144068062800000000`
   - Data-owner balance after: `1078217144068062800000000`
-- Multi-tenant views:
+- Authenticated machine query `5` (`/api/v1/query`, API key + idempotency):
+  - Request transaction: `9RUAXRcPN3qzDkTiK3PmopQ5JNWa26SZ2L1e6wLCdVdp`
+  - Acceptance transaction: `CSdxbHN61TYtbXhim4q1TyGnCxR9SSdBTCJzmHoFpNg3`
+  - OutLayer task: `30169`
+  - Attestation: `PROVEN task 30169 (execute) 9b68a814e31e143d…2bb8a8bd`
+  - Data-owner balance before: `1078217144068062800000000`
+  - Data-owner balance after: `1088217144068062800000000`
+  - Replay with the same `Idempotency-Key`: `X-Idempotent-Replay: true`, same query ID, budget unchanged
+  - Unauthenticated request: HTTP `401`
+- Demo UI query `7` after API refactor (browser endpoint):
+  - Request transaction: `6r3tGfDMNAUZXFAdqro5MY9vsMW729M4Qe1nsN9bsQP`
+  - Acceptance transaction: `8kayzZtgUCVu1vEj6XMQVijNmSkpLf4pyXJSQtbRTkC8`
+  - Proof: `true`
+  - Data-owner balance before: `1098217144068062800000000`
+  - Data-owner balance after: `1108217144068062800000000`
+- MCP query `6` (`run_query` through `mcp/server.py`):
+  - Request transaction: `B5eS1qparbbvut8UEDt3YQ4HYuMxKgc424mJdgjqLLS3`
+  - Acceptance transaction: `H3pb1M14SLA6GHCCPcwnhv4VE1M4hb4YT7J47jCYou9e`
+  - OutLayer task: `30170`
+  - Attestation: `PROVEN task 30170 (execute) a133d34367f73895…19be358f`
+  - Status: `settled`
+  - MCP tools exercised: `list_datasets`, `quote`, `run_query`, `get_query`, `verify_query`
+- Multi-tenant views after queries 3-6:
   - `list_datasets`: `["retail_alt","retail_v1"]`
   - `list_computations`: `["spend_growth_alt","spend_growth_v1"]`
-  - `get_queries_for_agent(agent2)`: `[1,2]`
+  - `get_queries_for_agent(agent2)`: `[1,2,3,4,5,6]`
+  - `get_queries_for_dataset(retail_v1)`: `[1,3,4,5,6]`
   - `get_queries_for_dataset(retail_alt)`: `[2]`
 
 ## End-to-end query
@@ -289,6 +312,7 @@ python3 scripts/verify_query.py \
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback output is limited to 900 bytes; larger results would require off-chain delivery plus hash settlement.
 - Execution is limited to 180 seconds.
-- The PoC supports one dataset, one computation, one agent, and one contract.
-- Dataset rotation, differential privacy, and multi-tenant marketplace features are not implemented.
+- The demo supports two datasets across two owners, one approved computation per dataset, and one configured agent key.
+- Differential privacy and a full marketplace discovery/ordering layer are not implemented.
+- The demo API keeps idempotency and rate-limit state in memory in a single process.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.

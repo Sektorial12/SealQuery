@@ -41,18 +41,23 @@ OutLayer provides Intel TDX execution and per-execution attestations. NEAR provi
 contracts/sealquery/   NEAR contract
 workload/              probe and approved WASI computation
 agent/                 agent client
-scripts/               dataset preparation and query verification
+api/                   demo API and machine agent endpoint
+web/                   static query frontend
+mcp/                   MCP stdio server
+scripts/               dataset preparation, query verification, smoke tests
 docs/                  evidence log
 ```
 
 ## Requirements
 
+- Python 3.11+
 - Rust 1.99.1 (pinned in `rust-toolchain.toml`)
 - `cargo-near` 0.23.0
 - `near-cli-rs` 0.31.1
 - `wasmtime` 50.0.1
 - `outlayer` CLI 0.2.2
 - `outlayer-verify` 0.1.0
+- Python packages: `Flask`, `requests`
 - NEAR testnet accounts: deployer, contract, data owner, agent
 - OutLayer testnet login and a project-restricted payment key
 
@@ -281,9 +286,59 @@ result, and returns the owner payout delta. No keys are exposed to the browser.
 API endpoints:
 
 - `GET /api/state` — contract state, datasets, budgets, recent queries
-- `POST /api/query` — run the configured demo agent
+- `GET /api/usage` — query history for the configured agent
+- `POST /api/query` — browser-facing demo query
+- `POST /api/v1/query` — machine query; requires `X-API-Key` when configured
+- `GET /api/v1/query/<id>` — machine query record
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
 - `GET /api/health`
+
+Set `SEALQUERY_API_KEY` before starting the server to require an API key on the
+machine endpoint. The browser endpoint stays same-origin and key-free.
+
+```bash
+export SEALQUERY_API_KEY='local-demo-key'
+SEALQUERY_API_KEY="$SEALQUERY_API_KEY" ./scripts/run_demo.sh
+
+curl -s http://127.0.0.1:8080/api/v1/query \
+  -H "X-API-Key: $SEALQUERY_API_KEY" \
+  -H 'Idempotency-Key: demo-query-1' \
+  -H 'Content-Type: application/json' \
+  -d '{"dataset_id":"retail_v1"}' | jq '{ok,query_id,proof,accept_tx}'
+```
+
+Repeating the same `Idempotency-Key` returns the cached response with
+`X-Idempotent-Replay: true` instead of paying twice. The machine endpoint also
+enforces a per-key rate limit (`SEALQUERY_RATE_LIMIT_PER_MINUTE`, default 5).
+
+## MCP
+
+`mcp/server.py` exposes `list_datasets`, `quote`, `run_query`, `get_query`, and
+`verify_query` to MCP clients over stdio.
+
+```json
+{
+  "mcpServers": {
+    "sealquery": {
+      "command": "python3",
+      "args": ["/absolute/path/to/code/mcp/server.py"],
+      "env": {
+        "SEALQUERY_API_URL": "http://127.0.0.1:8080",
+        "SEALQUERY_API_KEY": "<same local key>"
+      }
+    }
+  }
+}
+```
+
+Smoke test:
+
+```bash
+python3 scripts/mcp_smoke_test.py
+python3 scripts/mcp_smoke_test.py --query
+```
+
+See `mcp/README.md` for details.
 
 ## Multi-tenant controls
 
@@ -343,6 +398,8 @@ Highlights:
 - Replay and unauthorized acceptance: rejected.
 - Tampered proof: `NOT PROVEN`.
 - Privacy budget: 20 queries allowed; 21st rejected with `daily privacy budget exceeded`.
+- Authenticated machine query: task `30169`, `PROVEN`, idempotent replay verified.
+- MCP query: task `30170`, `PROVEN`, all five MCP tools exercised.
 
 ## Known limitations
 
@@ -351,8 +408,10 @@ Highlights:
 - The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
 - Execution is limited to 180 seconds.
 - One dataset, one computation, one agent, and one contract are supported.
-- Dataset rotation, differential privacy, and multi-tenant marketplace features are not implemented.
+- Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
+- Large results over the NEAR callback limit still need an off-chain delivery path.
+- The demo API is single-process; idempotency and rate-limit state are in memory.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 
 ## Third-party components

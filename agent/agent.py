@@ -14,39 +14,57 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 
 import requests
 
-RPC_URL = os.environ.get("NEAR_RPC", "https://rpc.testnet.near.org")
+RPC_URL = os.environ.get("NEAR_RPC", "https://rpc.testnet.fastnear.com")
 OUTLAYER_API = os.environ.get("OUTLAYER_API", "https://testnet-api.outlayer.ai")
 NEAR_NETWORK = os.environ.get("NEAR_NETWORK", "testnet")
+RPC_CONCURRENCY = max(1, int(os.environ.get("NEAR_RPC_CONCURRENCY", "3")))
+_rpc_semaphore = threading.Semaphore(RPC_CONCURRENCY)
 
 
 def rpc_view(contract: str, method: str, args: dict) -> dict:
     encoded = base64.b64encode(json.dumps(args).encode()).decode()
-    response = requests.post(
-        RPC_URL,
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "query",
-            "params": {
-                "request_type": "call_function",
-                "finality": "final",
-                "account_id": contract,
-                "method_name": method,
-                "args_base64": encoded,
-            },
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if "error" in payload:
-        raise RuntimeError(payload["error"])
-    data = payload["result"]["result"]
-    return json.loads(bytes(data).decode())
+    last_error: Exception | None = None
+    for attempt in range(6):
+        response = None
+        with _rpc_semaphore:
+            try:
+                response = requests.post(
+                    RPC_URL,
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "query",
+                        "params": {
+                            "request_type": "call_function",
+                            "finality": "final",
+                            "account_id": contract,
+                            "method_name": method,
+                            "args_base64": encoded,
+                        },
+                    },
+                    timeout=30,
+                )
+            except requests.RequestException as error:
+                last_error = error
+            if response is not None:
+                if response.status_code == 429 or 500 <= response.status_code < 600:
+                    last_error = RuntimeError(
+                        f"RPC {response.status_code}: {response.text[:200]}"
+                    )
+                else:
+                    response.raise_for_status()
+                    payload = response.json()
+                    if "error" in payload:
+                        raise RuntimeError(payload["error"])
+                    data = payload["result"]["result"]
+                    return json.loads(bytes(data).decode())
+        time.sleep(0.5 * (2**attempt))
+    raise RuntimeError(f"RPC view failed after retries: {last_error}")
 
 
 def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) -> str:

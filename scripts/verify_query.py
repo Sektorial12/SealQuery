@@ -15,7 +15,7 @@ import requests
 def view(contract: str, method: str, args: dict) -> dict:
     encoded = base64.b64encode(json.dumps(args).encode()).decode()
     response = requests.post(
-        "https://rpc.testnet.near.org",
+        "https://rpc.testnet.fastnear.com",
         json={
             "jsonrpc": "2.0",
             "id": 1,

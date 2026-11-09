@@ -3,10 +3,14 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import pathlib
 import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -18,6 +22,9 @@ import agent.agent as agent_client
 WEB_DIR = ROOT / "web"
 CONTRACT = os.environ["CONTRACT_ACCOUNT"]
 AGENT = os.environ["AGENT_ACCOUNT"]
+API_KEY = os.environ.get("SEALQUERY_API_KEY")
+RATE_LIMIT = int(os.environ.get("SEALQUERY_RATE_LIMIT_PER_MINUTE", "5"))
+IDEMPOTENCY_TTL = int(os.environ.get("SEALQUERY_IDEMPOTENCY_TTL_SECONDS", "86400"))
 DATASETS = json.loads(
     os.environ.get(
         "DEMO_DATASETS",
@@ -32,6 +39,11 @@ DEFAULT_PARAMS = {
 }
 
 app = Flask(__name__, static_folder=str(WEB_DIR), static_url_path="")
+
+_rate_lock = threading.Lock()
+_rate_events: dict[str, list[float]] = {}
+_idempotency_lock = threading.Lock()
+_idempotency: dict[str, tuple[float, dict]] = {}
 
 
 def account_balance(account_id: str) -> str | None:
@@ -59,22 +71,21 @@ def account_balance(account_id: str) -> str | None:
 
 
 def dataset_state(dataset_id: str, computation_id: str) -> dict:
-    dataset = agent_client.rpc_view(
-        CONTRACT, "get_dataset", {"dataset_id": dataset_id}
-    )
-    computation = agent_client.rpc_view(
-        CONTRACT, "get_computation", {"computation_id": computation_id}
-    )
-    quote = agent_client.rpc_view(
-        CONTRACT,
-        "quote",
-        {"dataset_id": dataset_id, "computation_id": computation_id},
-    )
-    budget = agent_client.rpc_view(
-        CONTRACT,
-        "get_budget",
-        {"agent": AGENT, "dataset_id": dataset_id},
-    )
+    calls = [
+        ("get_dataset", {"dataset_id": dataset_id}),
+        ("get_computation", {"computation_id": computation_id}),
+        (
+            "quote",
+            {"dataset_id": dataset_id, "computation_id": computation_id},
+        ),
+        ("get_budget", {"agent": AGENT, "dataset_id": dataset_id}),
+    ]
+    with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [
+            pool.submit(agent_client.rpc_view, CONTRACT, method, args)
+            for method, args in calls
+        ]
+        dataset, computation, quote, budget = [future.result() for future in futures]
     return {
         "dataset_id": dataset_id,
         "computation_id": computation_id,
@@ -85,6 +96,89 @@ def dataset_state(dataset_id: str, computation_id: str) -> dict:
     }
 
 
+def check_rate_limit(identity: str) -> bool:
+    now = time.time()
+    with _rate_lock:
+        events = [event for event in _rate_events.get(identity, []) if now - event < 60]
+        if len(events) >= RATE_LIMIT:
+            _rate_events[identity] = events
+            return False
+        events.append(now)
+        _rate_events[identity] = events
+        return True
+
+
+def require_machine_auth():
+    if not API_KEY:
+        return None
+    supplied = request.headers.get("X-API-Key", "")
+    if not hmac.compare_digest(supplied, API_KEY):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    return None
+
+
+def execute_query(body: dict) -> dict:
+    dataset_id = body.get("dataset_id", DATASETS[0][0])
+    computation_id = body.get("computation_id", DATASETS[0][1])
+    params = body.get("params") or DEFAULT_PARAMS
+    dataset = agent_client.rpc_view(
+        CONTRACT, "get_dataset", {"dataset_id": dataset_id}
+    )
+    owner = dataset["owner"]
+    owner_before = account_balance(owner)
+    query_id, tx_hash = agent_client.request_query(
+        CONTRACT, AGENT, dataset_id, computation_id, params
+    )
+    query = agent_client.wait_for_result(CONTRACT, query_id)
+    result = None
+    if query.get("result"):
+        try:
+            result = json.loads(query["result"])
+        except json.JSONDecodeError:
+            result = query["result"]
+
+    proof = False
+    proof_output = ""
+    accept_tx = None
+    refund_tx = None
+
+    if query["status"] == "ready":
+        proof, proof_output = agent_client.verify_attestation(tx_hash, None)
+        if proof:
+            accept_tx = agent_client.near_call(
+                CONTRACT,
+                "accept_result",
+                {"query_id": query_id},
+                AGENT,
+                "0 NEAR",
+            )
+    elif query["status"] == "failed":
+        refund_tx = agent_client.near_call(
+            CONTRACT,
+            "refund_query",
+            {"query_id": query_id},
+            AGENT,
+            "0 NEAR",
+        )
+
+    return {
+        "ok": True,
+        "dataset_id": dataset_id,
+        "computation_id": computation_id,
+        "query_id": query_id,
+        "tx_hash": tx_hash,
+        "status": query["status"],
+        "result": result,
+        "proof": proof,
+        "proof_output": proof_output,
+        "accept_tx": accept_tx,
+        "refund_tx": refund_tx,
+        "owner": owner,
+        "owner_before": owner_before,
+        "owner_after": account_balance(owner),
+    }
+
+
 @app.get("/")
 def index():
     return send_from_directory(WEB_DIR, "index.html")
@@ -92,33 +186,69 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return jsonify({"ok": True, "contract": CONTRACT, "agent": AGENT})
+    return jsonify(
+        {
+            "ok": True,
+            "contract": CONTRACT,
+            "agent": AGENT,
+            "machine_auth": bool(API_KEY),
+        }
+    )
 
 
 @app.get("/api/state")
 def state():
-    paused = agent_client.rpc_view(CONTRACT, "get_paused", {})
-    protocol_fee_bps = agent_client.rpc_view(CONTRACT, "get_protocol_fee_bps", {})
-    query_ids = agent_client.rpc_view(
-        CONTRACT, "get_queries_for_agent", {"agent": AGENT}
-    )
-    recent = []
-    for query_id in query_ids[-5:]:
-        recent.append(
-            agent_client.rpc_view(CONTRACT, "get_query", {"query_id": query_id})
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        paused_future = pool.submit(
+            agent_client.rpc_view, CONTRACT, "get_paused", {}
         )
-    datasets = []
-    for dataset_id, computation_id in DATASETS:
-        try:
-            datasets.append(dataset_state(dataset_id, computation_id))
-        except Exception as error:
-            datasets.append(
-                {
-                    "dataset_id": dataset_id,
-                    "computation_id": computation_id,
-                    "error": str(error),
-                }
+        protocol_fee_future = pool.submit(
+            agent_client.rpc_view, CONTRACT, "get_protocol_fee_bps", {}
+        )
+        query_ids_future = pool.submit(
+            agent_client.rpc_view,
+            CONTRACT,
+            "get_queries_for_agent",
+            {"agent": AGENT},
+        )
+        dataset_futures = [
+            (
+                dataset_id,
+                computation_id,
+                pool.submit(dataset_state, dataset_id, computation_id),
             )
+            for dataset_id, computation_id in DATASETS
+        ]
+        paused = paused_future.result()
+        protocol_fee_bps = protocol_fee_future.result()
+        query_ids = query_ids_future.result()
+        recent_futures = [
+            (
+                query_id,
+                pool.submit(
+                    agent_client.rpc_view,
+                    CONTRACT,
+                    "get_query",
+                    {"query_id": query_id},
+                ),
+            )
+            for query_id in query_ids[-5:]
+        ]
+        datasets = []
+        for dataset_id, computation_id, future in dataset_futures:
+            try:
+                datasets.append(future.result())
+            except Exception as error:
+                datasets.append(
+                    {
+                        "dataset_id": dataset_id,
+                        "computation_id": computation_id,
+                        "error": str(error),
+                    }
+                )
+        recent = []
+        for query_id, future in recent_futures:
+            recent.append({"query_id": query_id, **future.result()})
     return jsonify(
         {
             "contract": CONTRACT,
@@ -131,71 +261,74 @@ def state():
     )
 
 
+@app.get("/api/usage")
+def usage():
+    query_ids = agent_client.rpc_view(
+        CONTRACT, "get_queries_for_agent", {"agent": AGENT}
+    )
+    queries = [
+        agent_client.rpc_view(CONTRACT, "get_query", {"query_id": query_id})
+        for query_id in query_ids
+    ]
+    return jsonify({"agent": AGENT, "count": len(queries), "queries": queries})
+
+
 @app.post("/api/query")
 def run_query():
+    identity = f"browser:{request.remote_addr}"
+    if not check_rate_limit(identity):
+        return jsonify({"ok": False, "error": "rate limit exceeded"}), 429
     body = request.get_json(silent=True) or {}
-    dataset_id = body.get("dataset_id", DATASETS[0][0])
-    computation_id = body.get("computation_id", DATASETS[0][1])
-    params = body.get("params") or DEFAULT_PARAMS
     try:
-        dataset = agent_client.rpc_view(
-            CONTRACT, "get_dataset", {"dataset_id": dataset_id}
-        )
-        owner = dataset["owner"]
-        owner_before = account_balance(owner)
-        query_id, tx_hash = agent_client.request_query(
-            CONTRACT, AGENT, dataset_id, computation_id, params
-        )
-        query = agent_client.wait_for_result(CONTRACT, query_id)
-        result = None
-        if query.get("result"):
-            try:
-                result = json.loads(query["result"])
-            except json.JSONDecodeError:
-                result = query["result"]
-
-        proof = False
-        proof_output = ""
-        accept_tx = None
-        refund_tx = None
-
-        if query["status"] == "ready":
-            proof, proof_output = agent_client.verify_attestation(tx_hash, None)
-            if proof:
-                accept_tx = agent_client.near_call(
-                    CONTRACT,
-                    "accept_result",
-                    {"query_id": query_id},
-                    AGENT,
-                    "0 NEAR",
-                )
-        elif query["status"] == "failed":
-            refund_tx = agent_client.near_call(
-                CONTRACT,
-                "refund_query",
-                {"query_id": query_id},
-                AGENT,
-                "0 NEAR",
-            )
-
-        return jsonify(
-            {
-                "ok": True,
-                "query_id": query_id,
-                "tx_hash": tx_hash,
-                "status": query["status"],
-                "result": result,
-                "proof": proof,
-                "proof_output": proof_output,
-                "accept_tx": accept_tx,
-                "refund_tx": refund_tx,
-                "owner": owner,
-                "owner_before": owner_before,
-                "owner_after": account_balance(owner),
-            }
-        )
+        return jsonify(execute_query(body))
     except Exception as error:
         return jsonify({"ok": False, "error": str(error)}), 500
+
+
+@app.post("/api/v1/query")
+def run_machine_query():
+    auth_error = require_machine_auth()
+    if auth_error:
+        return auth_error
+    identity = request.headers.get("X-API-Key") or request.remote_addr or "anonymous"
+    if not check_rate_limit(identity):
+        return jsonify({"ok": False, "error": "rate limit exceeded"}), 429
+
+    idempotency_key = request.headers.get("Idempotency-Key")
+    now = time.time()
+    if idempotency_key:
+        with _idempotency_lock:
+            cached = _idempotency.get(idempotency_key)
+            if cached and now - cached[0] < IDEMPOTENCY_TTL:
+                response = jsonify(cached[1])
+                response.headers["X-Idempotent-Replay"] = "true"
+                return response
+
+    body = request.get_json(silent=True) or {}
+    try:
+        result = execute_query(body)
+    except Exception as error:
+        return jsonify({"ok": False, "error": str(error)}), 500
+
+    if idempotency_key and result.get("ok"):
+        with _idempotency_lock:
+            _idempotency[idempotency_key] = (now, result)
+    return jsonify(result)
+
+
+@app.get("/api/v1/query/<int:query_id>")
+def machine_query(query_id: int):
+    auth_error = require_machine_auth()
+    if auth_error:
+        return auth_error
+    try:
+        return jsonify(
+            agent_client.rpc_view(
+                CONTRACT, "get_query", {"query_id": query_id}
+            )
+        )
+    except Exception as error:
+        return jsonify({"ok": False, "error": str(error)}), 404
 
 
 @app.get("/api/proof/<tx_hash>")
