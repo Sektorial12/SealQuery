@@ -29,6 +29,10 @@ neardev/
 .opencode/
 opencode.json
 
+# Local data and generated artifacts
+data/
+*.xlsx
+
 # Local notes that must never enter the repo
 *.local.md
 

@@ -2,57 +2,306 @@
 
 SealQuery lets AI agents pay to execute approved computations against privately held datasets without receiving the raw data.
 
-A data owner registers a dataset and the computations it permits. An agent requests one approved computation and pays for execution. The computation runs inside a trusted execution environment. The agent receives an attested result; the data owner receives payment or royalties. The raw data is never delivered to the agent.
+A data owner registers a dataset and the computations it permits. An agent requests one approved computation and pays for execution. The computation runs inside a trusted execution environment. The agent receives an attested result; the data owner receives payment. The raw data is never delivered to the agent.
 
-## Status
+## The problem
 
-Early development. The current goal is a testnet proof of the technical thesis:
+AI agents need external data, but the most valuable datasets cannot be handed over. Selling raw rows exposes sensitive information, violates contracts, or destroys the value of the data. Existing APIs expose only predefined aggregates, and enterprise clean rooms are not built for autonomous per-query agent access.
 
-- one real dataset stored privately;
-- one approved computation executed in a real TEE;
-- one agent query with on-chain payment;
-- independent attestation verification;
-- on-chain settlement only after the agent verifies the result;
-- rejection of unauthorized computations, unauthorized agents, replayed results, and privacy-budget violations.
+SealQuery sells the answer, not the dataset. The data owner keeps the raw data; the agent gets an attested result and a receipt.
 
-No production deployment yet.
+## What was built
 
-## Stack
+A working NEAR testnet proof with no mocked execution, attestation, access control, or payment:
 
-- NEAR testnet for dataset registration, query escrow, callbacks, settlement, and royalties.
-- OutLayer for Intel TDX confidential computation and execution attestations.
-- Rust/WASI workload for the approved computation.
-- Rust `near-sdk` contract for the registry and escrow.
+- A real private dataset stored in OutLayer encrypted worker storage.
+- One approved computation running in Intel TDX on OutLayer testnet.
+- A NEAR contract that registers datasets/computations, escrows payment, calls OutLayer, receives the result, and settles to the data owner.
+- An agent client that quotes, pays, waits, verifies the TEE attestation, and accepts the result.
+- A privacy budget of 20 queries per agent per dataset per day, a minimum cohort of 100, output rounding, and a canary row that never appears in results.
+- Negative-path tests for unauthorized computations, unauthorized acceptance, direct OutLayer calls, replay, failed executions, refunds, tampered attestations, and budget exhaustion.
+
+## How NEAR is used
+
+- **Dataset registry:** dataset metadata and approved computation list.
+- **Query escrow:** the agent’s payment is held by the contract.
+- **Execution request:** the contract calls `outlayer.testnet::request_execution`.
+- **Callback:** OutLayer resumes the NEAR yield and the contract receives the TEE result.
+- **Settlement:** the agent verifies the attestation and calls `accept_result`; the contract pays the data owner.
+- **Refunds:** failed or timed-out queries are refunded to the agent.
+- **Privacy budget:** enforced by the contract before the OutLayer call.
+
+OutLayer provides Intel TDX execution and per-execution attestations. NEAR provides the ownership, escrow, callback, and settlement layer.
 
 ## Repository layout
 
 ```
 contracts/sealquery/   NEAR contract
-workload/              approved WASI computation
+workload/              probe and approved WASI computation
 agent/                 agent client
-indexer/               attestation/task indexer
-scripts/               deployment and test scripts
-docs/                  evidence and design notes
+scripts/               dataset preparation and query verification
+docs/                  evidence log
 ```
 
-## Development
+## Requirements
 
-Build the contract:
+- Rust 1.99.1 (pinned in `rust-toolchain.toml`)
+- `cargo-near` 0.23.0
+- `near-cli-rs` 0.31.1
+- `wasmtime` 50.0.1
+- `outlayer` CLI 0.2.2
+- `outlayer-verify` 0.1.0
+- NEAR testnet accounts: deployer, contract, data owner, agent
+- OutLayer testnet login and a project-restricted payment key
+
+## Quick start
+
+### 1. Prepare the dataset
 
 ```bash
-cargo near build
+python3 scripts/prepare_dataset.py
 ```
 
-Build the workload:
+Expected:
+
+- 5,000 deterministic UCI Online Retail rows plus 1 synthetic canary row.
+- Dataset SHA-256: `65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983`
+- Canary country `Canaryland`, customer `99999`, invoice `CANARY-0001`.
+
+The source is public; it is used as a private-data stand-in. The privacy claim is about the architecture, not the secrecy of this public source.
+
+### 2. Run the workload tests
 
 ```bash
-cargo build --target wasm32-wasip2 --release -p sealquery-workload
+cargo test -p sealquery-workload
 ```
 
-Run tests:
+Expected: `5 passed`.
+
+### 3. Build the approved workload
 
 ```bash
-cargo test
+cargo build -p sealquery-workload \
+  --bin sealquery-approved \
+  --target wasm32-wasip2 \
+  --release \
+  --features wasm
 ```
 
-Exact testnet commands and reproducible evidence will be added as the implementation reaches each capability.
+Expected artifact: `target/wasm32-wasip2/release/sealquery-approved.wasm`.
+
+### 4. Publish the workload to OutLayer
+
+```bash
+outlayer login testnet
+outlayer upload target/wasm32-wasip2/release/sealquery-approved.wasm
+outlayer deploy sealquery-approved <FastFS URL from upload>
+```
+
+Expected project: `<deployer>/sealquery-approved`.
+
+Create and fund a project-restricted OutLayer payment key:
+
+```bash
+outlayer keys create --project '<deployer>/sealquery-approved'
+outlayer keys topup <nonce> --usd 1
+```
+
+### 5. Store the access secrets
+
+The upload secret is readable by the data owner. The compute secret is readable only when the SealQuery contract is the calling account.
+
+```bash
+outlayer secrets set \
+  --profile upload \
+  --generate PROTECTED_DATASET_UPLOAD_TOKEN:hex32 \
+  --project '<deployer>/sealquery-approved' \
+  --access 'whitelist:<deployer>'
+
+outlayer secrets set \
+  --profile compute \
+  --generate PROTECTED_COMPUTE_ACCESS_TOKEN:hex32 \
+  --project '<deployer>/sealquery-approved' \
+  --access 'whitelist:<deployer>'
+```
+
+Then lock the compute secret to the contract:
+
+```bash
+near contract call-function as-transaction outlayer.testnet update_access \
+  json-args '{
+    "accessor":{"Project":{"project_id":"<deployer>/sealquery-approved"}},
+    "profile":"compute",
+    "new_access":{"Predecessor":{"condition":{"Whitelist":{"accounts":["<contract>"]}}}}
+  }' \
+  prepaid-gas '100 Tgas' attached-deposit '0.05 NEAR' \
+  sign-as '<deployer>' network-config testnet sign-with-keychain send
+```
+
+Expected: `Access control updated`.
+
+### 6. Upload the dataset to encrypted worker storage
+
+Build `data/upload_input.json` with the CSV and its SHA-256, then run:
+
+```bash
+outlayer-verify run '<deployer>/sealquery-approved' \
+  --network testnet \
+  --api https://testnet-api.outlayer.ai \
+  --payment-key "$(outlayer keys show <nonce>)" \
+  --secrets-ref '<deployer>/upload' \
+  --input data/upload_input.json \
+  --bundle data/upload_proof.json
+```
+
+Expected output includes:
+
+```json
+{"bytes":451984,"ok":true,"operation":"upload_dataset","sha256":"65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983","stored":true,"version":"retail_v1"}
+```
+
+Expected verifier result: `PROVEN`.
+
+### 7. Build and deploy the contract
+
+```bash
+cargo near build non-reproducible-wasm --locked --no-abi
+
+near contract deploy '<contract>' \
+  use-file target/near/sealquery/sealquery.wasm \
+  with-init-call new \
+  json-args '{"owner":"<data-owner>"}' \
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' \
+  network-config testnet sign-with-keychain send
+```
+
+### 8. Register the dataset and computation
+
+```bash
+near contract call-function as-transaction '<contract>' register_dataset \
+  json-args '{
+    "dataset_id":"retail_v1",
+    "data_hash":"65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983",
+    "allowed_computations":["spend_growth"],
+    "price_yocto":"20000000000000000000000",
+    "compute_deposit_yocto":"10000000000000000000000",
+    "reward_yocto":"10000000000000000000000"
+  }' \
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' \
+  sign-as '<data-owner>' network-config testnet sign-with-keychain send
+
+near contract call-function as-transaction '<contract>' register_computation \
+  json-args '{
+    "computation_id":"spend_growth_v1",
+    "dataset_id":"retail_v1",
+    "outlayer_project_id":"<deployer>/sealquery-approved",
+    "wasm_hash":"<approved workload sha256>",
+    "operation":"spend_growth",
+    "version":"retail_v1",
+    "secret_profile":"compute",
+    "secret_account":"<deployer>"
+  }' \
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' \
+  sign-as '<data-owner>' network-config testnet sign-with-keychain send
+```
+
+### 9. Run the agent
+
+Create `data/agent_params.json`:
+
+```json
+{"period_a":"2011-11","period_b":"2011-12","countries":["United Kingdom"],"min_cohort_size":100}
+```
+
+Run:
+
+```bash
+python3 agent/agent.py \
+  --contract '<contract>' \
+  --agent '<agent>' \
+  --params-file data/agent_params.json \
+  --proof data/agent_query_proof.json
+```
+
+Expected:
+
+```
+query_id=...
+status=ready
+result={"dataset_sha256":"65a1...","min_cohort_size":100,"ok":true,...}
+PROVEN task ... (execute) ...
+settled
+```
+
+The result is an aggregate spend growth, not raw rows. The data owner receives `0.01 NEAR`.
+
+### 10. Verify independently
+
+```bash
+python3 scripts/verify_query.py \
+  --contract '<contract>' \
+  --query-id <query-id> \
+  --tx-hash <request tx hash> \
+  --proof data/verify_proof.json
+```
+
+Expected: the contract query record, the result, and `PROVEN`.
+
+## Payment flow
+
+- Agent pays `0.02 NEAR` to the contract.
+- Contract attaches `0.01 NEAR` to OutLayer for compute.
+- OutLayer charges actual compute and refunds the unused amount to the contract.
+- On acceptance, the contract pays the data owner `0.01 NEAR`.
+- On failure or timeout, the agent can call `refund_query` and receive `0.02 NEAR`.
+
+## Privacy controls
+
+- Dataset stays in OutLayer encrypted worker storage; only the approved WASM can read it.
+- The compute secret is readable only when the SealQuery contract is the predecessor account.
+- The approved computation accepts only allowed countries and periods.
+- Minimum cohort: 100.
+- Output rounding: spend to nearest 1,000; growth to 0.1%.
+- Cohort sizes are reported as `100+` or `suppressed`.
+- Per-agent, per-dataset daily budget: 20 queries.
+- A canary row is present in the dataset and must never appear in any result.
+
+## Test evidence
+
+See `docs/evidence.md` for transaction hashes, task IDs, attestation results, balances, and negative-test output.
+
+Highlights:
+
+- Dataset upload: OutLayer task `29129`, `PROVEN`.
+- Approved computation: OutLayer task `29136`, `PROVEN`.
+- Manual end-to-end query: task `29143`, `PROVEN`, payout `0.01 NEAR`.
+- Automated agent query: task `29145`, `PROVEN`, settled.
+- Refunds: queries 1 and 2 returned `0.02 NEAR` each.
+- Direct OutLayer call: denied by the secret access condition.
+- Replay and unauthorized acceptance: rejected.
+- Tampered proof: `NOT PROVEN`.
+- Privacy budget: 20 queries allowed; 21st rejected with `daily privacy budget exceeded`.
+
+## Known limitations
+
+- The dataset is public and used as a private-data stand-in.
+- OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
+- The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
+- Execution is limited to 180 seconds.
+- One dataset, one computation, one agent, and one contract are supported.
+- Dataset rotation, differential privacy, and multi-tenant marketplace features are not implemented.
+- Cross-chain payments and NEAR Intents are intentionally out of scope.
+- The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
+
+## Third-party components
+
+- NEAR Protocol and NEAR testnet
+- OutLayer verifiable compute and `outlayer-verify`
+- UCI Machine Learning Repository Online Retail dataset
+- `near-sdk`, `cargo-near`, `near-cli-rs`
+- `wasmtime`
+- Rust `csv`, `sha2`, `serde`, `serde_json`
+
+## License
+
+MIT. See `LICENSE`.
