@@ -30,6 +30,9 @@ neardev/
 opencode.json
 
 # Local data and generated artifacts
+__pycache__/
+*.pyc
+.venv/
 data/
 *.xlsx
 

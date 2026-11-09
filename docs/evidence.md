@@ -133,6 +133,12 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   - OutLayer task: `29215`
   - Attestation: `PROVEN task 29215 (execute) bcbd5d99243e0a06…6f6368e7`
   - Status: `settled`
+- Demo API query `4` (retail_v1):
+  - Request transaction: `B7WdyHky452KKVUySK6pa4jBimYHjCCzsbDtHwbzaNbd`
+  - Acceptance transaction: `9snQL3FXHTHjhSmnM3LJoryGtMNdcBLrBPRFHgwdqxR6`
+  - Proof: `true`
+  - Data-owner balance before: `1068217144068062800000000`
+  - Data-owner balance after: `1078217144068062800000000`
 - Multi-tenant views:
   - `list_datasets`: `["retail_alt","retail_v1"]`
   - `list_computations`: `["spend_growth_alt","spend_growth_v1"]`

@@ -259,6 +259,32 @@ python3 scripts/verify_query.py \
 
 Expected: the contract query record, the result, and `PROVEN`.
 
+## Demo UI
+
+The demo API serves a static frontend and runs the configured demo agent.
+
+```bash
+export CONTRACT_ACCOUNT='<v2 contract>'
+export AGENT_ACCOUNT='<agent account>'
+export NEAR_NETWORK=testnet
+export OUTLAYER_API=https://testnet-api.outlayer.ai
+./scripts/run_demo.sh
+```
+
+Open `http://127.0.0.1:8080`.
+
+The UI shows the available datasets, owners, prices, quota usage, and a
+**Run query** button. The server submits the real testnet transaction, waits for
+the TEE result, verifies the attestation with `outlayer-verify`, accepts the
+result, and returns the owner payout delta. No keys are exposed to the browser.
+
+API endpoints:
+
+- `GET /api/state` — contract state, datasets, budgets, recent queries
+- `POST /api/query` — run the configured demo agent
+- `GET /api/proof/<tx_hash>` — re-run attestation verification
+- `GET /api/health`
+
 ## Multi-tenant controls
 
 ```bash

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SealQuery — private data computation</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">SQ</span>
+        <div>
+          <strong>SealQuery</strong>
+          <span class="sub">Private data computation for AI agents</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="network" class="pill">NEAR testnet</span>
+        <a id="contract-link" class="pill ghost" target="_blank" rel="noreferrer">contract</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Compute-to-data, verifiably</p>
+        <h1>Sell the answer.<br />Not the dataset.</h1>
+        <p class="lede">
+          A data owner keeps the raw data. An AI agent pays for one approved
+          computation. The result runs inside an Intel TDX enclave and comes
+          back with a proof, not the rows.
+        </p>
+        <div class="hero-actions">
+          <button id="refresh" class="button ghost-button">Refresh state</button>
+          <a class="button ghost-button" href="https://github.com/sealquery/sealquery" target="_blank" rel="noreferrer">Repository</a>
+        </div>
+      </section>
+
+      <section id="banner" class="banner hidden"></section>
+
+      <section class="grid">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Available datasets</p>
+              <h2>Private inventory</h2>
+            </div>
+            <span id="dataset-count" class="pill">0</span>
+          </div>
+          <div id="datasets" class="dataset-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Agent console</p>
+              <h2>Run an approved computation</h2>
+            </div>
+            <span id="budget-pill" class="pill">budget —</span>
+          </div>
+
+          <div id="selected-dataset" class="selected">
+            <p class="muted">Select a dataset to begin.</p>
+          </div>
+
+          <button id="run" class="button primary" disabled>Run query</button>
+          <p class="fineprint">
+            The configured demo agent pays 0.02–0.03 NEAR, verifies the
+            attestation, then settles the data owner.
+          </p>
+
+          <div id="timeline" class="timeline hidden">
+            <div class="step" data-step="request">
+              <span class="dot"></span>
+              <span>Request submitted</span>
+            </div>
+            <div class="step" data-step="compute">
+              <span class="dot"></span>
+              <span>TEE computation</span>
+            </div>
+            <div class="step" data-step="verify">
+              <span class="dot"></span>
+              <span>Attestation verified</span>
+            </div>
+            <div class="step" data-step="settle">
+              <span class="dot"></span>
+              <span>Data owner settled</span>
+            </div>
+          </div>
+
+          <div id="error" class="error hidden"></div>
+        </div>
+      </section>
+
+      <section id="result-panel" class="panel result-panel hidden">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Authorized result</p>
+            <h2 id="result-title">Aggregate output</h2>
+          </div>
+          <span id="proof-badge" class="pill proof">PROVEN</span>
+        </div>
+        <div id="result-summary" class="summary"></div>
+        <div id="result-table"></div>
+        <div id="result-meta" class="meta-grid"></div>
+        <details class="proof-box">
+          <summary>Attestation output</summary>
+          <pre id="proof-output"></pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Recent activity</p>
+            <h2>Query history</h2>
+          </div>
+        </div>
+        <div id="history"></div>
+      </section>
+
+      <section class="panel privacy">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Privacy controls</p>
+            <h2>What the agent never gets</h2>
+          </div>
+        </div>
+        <div class="privacy-grid">
+          <div>
+            <strong>Raw rows</strong>
+            <p>The dataset stays in encrypted worker storage. Only the approved WASM can read it.</p>
+          </div>
+          <div>
+            <strong>Small cohorts</strong>
+            <p>Minimum cohort 100, rounded spend, growth to 0.1%, and suppressed counts.</p>
+          </div>
+          <div>
+            <strong>Unlimited probing</strong>
+            <p>Per-agent, per-dataset daily budgets stop repeated queries from reconstructing data.</p>
+          </div>
+          <div>
+            <strong>Unapproved code</strong>
+            <p>The compute secret is readable only when the SealQuery contract calls OutLayer.</p>
+          </div>
+        </div>
+        <p class="fineprint">
+          The canary row <code>CANARY-0001</code> / <code>Canaryland</code> is in the
+          dataset. It must never appear in a result. The attestation proves what ran,
+          not that the model is correct.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <span>SealQuery testnet proof</span>
+      <span id="footer-meta">contract — · dataset —</span>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

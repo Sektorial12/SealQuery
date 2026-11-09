@@ -137,7 +137,7 @@ def wait_for_result(contract: str, query_id: int, timeout_seconds: int = 90) -> 
     raise TimeoutError(f"query {query_id} did not resolve in {timeout_seconds}s")
 
 
-def verify_attestation(tx_hash: str, proof_path: str | None) -> bool:
+def verify_attestation(tx_hash: str, proof_path: str | None) -> tuple[bool, str]:
     command = [
         "outlayer-verify",
         "tx",
@@ -151,9 +151,8 @@ def verify_attestation(tx_hash: str, proof_path: str | None) -> bool:
     if proof_path:
         command.extend(["--bundle", proof_path])
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
-    output = completed.stdout + completed.stderr
-    print(output.strip())
-    return completed.returncode == 0 and "PROVEN" in output
+    output = (completed.stdout + completed.stderr).strip()
+    return completed.returncode == 0 and "PROVEN" in output, output
 
 
 def main() -> int:
@@ -181,7 +180,9 @@ def main() -> int:
     print(f"result={query.get('result')}")
 
     if query["status"] == "ready":
-        if verify_attestation(tx_hash, args.proof):
+        proven, proof_output = verify_attestation(tx_hash, args.proof)
+        print(proof_output)
+        if proven:
             near_call(
                 args.contract,
                 "accept_result",
