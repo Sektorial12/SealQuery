@@ -87,7 +87,7 @@ cd contracts/sealquery
 cargo near build reproducible-wasm
 ```
 
-Expected contract hash: `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
+Expected v2 contract hash: `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 

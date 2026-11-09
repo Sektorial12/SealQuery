@@ -91,9 +91,10 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - v2 deployer: `sealquery-v2-1794194344.testnet`
 - v2 contract: `contract.sealquery-v2-1794194344.testnet`
 - Contract version: `0.2.0`
-- v2 code SHA-256: `42d9cca2e85cd8c287b39ff72e808ace023d2949ca56cd405518422458443069`
+- v2 code SHA-256 (reproducible build): `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`
 - Contract account funding transaction: `98B7gLLQRMfBbHMNtzMGz7Gp8wHABVpKscFETXRNvquh`
-- Deploy transaction: `dL3mcj92RyifeLzud5d4WdbxLYvYPQ9Z33kMssKTR4j`
+- Initial deploy transaction: `dL3mcj92RyifeLzud5d4WdbxLYvYPQ9Z33kMssKTR4j`
+- Reproducible code deploy transaction: `DmA4RP8JvQFyTv9a4Yxu1R3D8f1MpEUw2Dv99EV5bbEX`
 - Compute secret access locked to v2 contract: transaction `6AiVHiGSwq2tRRw4nYrwQ1N3aGSGYLw7popd45AWHaGw`
 - Dataset `retail_v1`:
   - Owner: `owner.sealquery-1794187176.testnet`
@@ -127,6 +128,11 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Dataset rotation:
   - `retail_alt` rotated to `retail_v2`: `7cJBzGaWD4qhzn4Hn8ZrZXAcdDq1VWmBgMt7CxPhnLju`
   - Rotated back to `retail_v1`: `DETpxobXMMZrLVc2KLbgeWHUb8Nw72vta5HfXE2YB64A`
+- Query `3` after reproducible v2 deploy:
+  - Request transaction: `6RJhWeGkyCs6yzZkFzEwrk3FfRqiGiDZ23GD3SyYQ2Wp`
+  - OutLayer task: `29215`
+  - Attestation: `PROVEN task 29215 (execute) bcbd5d99243e0a06…6f6368e7`
+  - Status: `settled`
 - Multi-tenant views:
   - `list_datasets`: `["retail_alt","retail_v1"]`
   - `list_computations`: `["spend_growth_alt","spend_growth_v1"]`
