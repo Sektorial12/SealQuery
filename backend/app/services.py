@@ -12,10 +12,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import requests
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .models import DatasetRecord, JobRecord, QueryRecord, utcnow
+from .models import (
+    DatasetRecord,
+    EventRecord,
+    IndexerCheckpoint,
+    JobRecord,
+    QueryRecord,
+    utcnow,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -791,3 +799,177 @@ def reconcile_jobs(db: Session) -> int:
             _job_fail(db, job, f"reconciliation failed: {error}")
             count += 1
     return count
+
+
+def list_events(db: Session, limit: int = 50) -> list[dict]:
+    rows = (
+        db.query(EventRecord)
+        .order_by(EventRecord.block_height.desc(), EventRecord.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "event_id": row.event_id,
+            "block_height": row.block_height,
+            "tx_hash": row.tx_hash,
+            "receipt_id": row.receipt_id,
+            "standard": row.standard,
+            "version": row.version,
+            "event": row.event,
+            "data": json.loads(row.data) if row.data else None,
+        }
+        for row in rows
+    ]
+
+
+def _neardata_block(height: int) -> dict | None:
+    base = settings.neardata_api.rstrip("/")
+    response = requests.get(f"{base}/v0/block/{height}", timeout=30)
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return response.json()
+
+
+def _apply_event(
+    db: Session,
+    event_name: str,
+    data: list,
+    tx_hash: str,
+    block_height: int,
+) -> None:
+    first = data[0] if data and isinstance(data[0], dict) else {}
+    query_id = first.get("query_id")
+    if query_id is None:
+        return
+    query_id = int(query_id)
+    query = db.get(QueryRecord, query_id)
+
+    if event_name == "query_settled" or event_name == "query_refunded":
+        try:
+            view = agent_client.rpc_view(
+                settings.contract_account, "get_query", {"query_id": query_id}
+            )
+        except Exception:
+            view = None
+        if view:
+            request_tx = query.tx_hash if query else None
+            upsert_query(
+                db,
+                query_id,
+                view,
+                request_tx,
+                tx_hash if event_name == "query_settled" else None,
+                tx_hash if event_name == "query_refunded" else None,
+            )
+        elif query:
+            query.status = "settled" if event_name == "query_settled" else "refunded"
+            if event_name == "query_settled":
+                query.accept_tx = tx_hash
+            else:
+                query.refund_tx = tx_hash
+            query.updated_at = utcnow()
+        return
+
+    if query is None:
+        query = QueryRecord(
+            query_id=query_id,
+            agent=first.get("agent", settings.agent_account),
+            dataset_id=first.get("dataset_id", ""),
+            computation_id=first.get("computation_id", ""),
+            status="pending" if event_name == "query_requested" else first.get("status", "unknown"),
+            result=None,
+            deposit_yocto="0",
+            created_block=block_height,
+            tx_hash=tx_hash if event_name == "query_requested" else None,
+        )
+        db.add(query)
+    else:
+        if event_name == "query_requested":
+            query.tx_hash = tx_hash
+            if not query.status or query.status == "unknown":
+                query.status = "pending"
+        elif event_name == "query_result":
+            query.status = first.get("status", query.status)
+        query.updated_at = utcnow()
+
+
+def sync_events(db: Session) -> int:
+    """Index NEP-297 events forward from a saved Neardata checkpoint."""
+    base = settings.neardata_api.rstrip("/")
+    latest_response = requests.get(f"{base}/v0/last_block/final", timeout=30)
+    latest_response.raise_for_status()
+    latest = int(latest_response.json()["block"]["header"]["height"])
+
+    checkpoint = db.get(IndexerCheckpoint, "events")
+    if checkpoint is None:
+        start = settings.event_start_block if settings.event_start_block is not None else latest
+        checkpoint = IndexerCheckpoint(name="events", last_block=max(0, start - 1))
+        db.add(checkpoint)
+        db.commit()
+
+    if checkpoint.last_block >= latest:
+        return 0
+
+    end = min(latest, checkpoint.last_block + settings.event_blocks_per_sync)
+    processed = 0
+    for height in range(checkpoint.last_block + 1, end + 1):
+        try:
+            block = _neardata_block(height)
+        except Exception:
+            break
+        if block is None:
+            checkpoint.last_block = height
+            db.commit()
+            continue
+        for shard in block.get("shards", []):
+            for outcome in shard.get("receipt_execution_outcomes", []):
+                receipt = outcome.get("receipt") or {}
+                execution = outcome.get("execution_outcome") or {}
+                result = execution.get("outcome") or {}
+                receiver = receipt.get("receiver_id")
+                executor = result.get("executor_id")
+                if settings.contract_account not in {receiver, executor}:
+                    continue
+                tx_hash = outcome.get("tx_hash")
+                receipt_id = receipt.get("receipt_id", "")
+                logs = result.get("logs") or []
+                for log_index, log in enumerate(logs):
+                    if not isinstance(log, str) or not log.startswith("EVENT_JSON:"):
+                        continue
+                    try:
+                        parsed = json.loads(log[len("EVENT_JSON:") :])
+                    except json.JSONDecodeError:
+                        continue
+                    if parsed.get("standard") != "sealquery":
+                        continue
+                    event_id = f"{tx_hash}:{receipt_id}:{log_index}"
+                    if db.get(EventRecord, event_id):
+                        continue
+                    data = parsed.get("data") or []
+                    db.add(
+                        EventRecord(
+                            event_id=event_id,
+                            block_height=height,
+                            tx_hash=tx_hash or "",
+                            receipt_id=receipt_id,
+                            standard=parsed.get("standard", ""),
+                            version=parsed.get("version", ""),
+                            event=parsed.get("event", ""),
+                            data=json.dumps(data),
+                        )
+                    )
+                    _apply_event(
+                        db,
+                        parsed.get("event", ""),
+                        data,
+                        tx_hash or "",
+                        height,
+                    )
+        checkpoint.last_block = height
+        checkpoint.updated_at = utcnow()
+        db.commit()
+        processed += 1
+        invalidate_snapshot()
+    return processed

@@ -420,6 +420,23 @@ python3 scripts/verify_query.py \
   `PROVEN`.
 - Compose now runs a separate `worker` service with the mounted access-key file.
 
+## Event-log indexer
+
+- `indexer` now also streams NEP-297 `EVENT_JSON` logs from Neardata
+  (`https://testnet.neardata.xyz`), stores them in `events`, and updates query
+  records.
+- Incremental by default from the latest finalized block; optional backfill via
+  `EVENT_START_BLOCK`.
+- Test backfill from block `277018789` with a 25-block window:
+  - `query_requested` at block `277018789`.
+  - `query_result` at block `277018801`.
+  - `query_settled` at block `277018811`.
+  - Query `25` ended `settled` with request tx `Z2fk...` and accept tx
+    `C1FcB...`.
+- Neardata event indexing is rate-limited to 20 blocks per indexer cycle by
+  default; the polling indexer remains the historical fallback.
+- `GET /api/events` exposes recent indexed events.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.

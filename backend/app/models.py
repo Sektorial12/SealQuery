@@ -69,3 +69,25 @@ class JobRecord(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class EventRecord(Base):
+    __tablename__ = "events"
+
+    event_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    block_height: Mapped[int] = mapped_column(Integer)
+    tx_hash: Mapped[str] = mapped_column(String(128))
+    receipt_id: Mapped[str] = mapped_column(String(128))
+    standard: Mapped[str] = mapped_column(String(64))
+    version: Mapped[str] = mapped_column(String(32))
+    event: Mapped[str] = mapped_column(String(64))
+    data: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class IndexerCheckpoint(Base):
+    __tablename__ = "indexer_checkpoints"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    last_block: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

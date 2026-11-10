@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     indexer_interval_seconds: int = 15
     indexer_on_startup: bool = False
+    neardata_api: str = "https://testnet.neardata.xyz"
+    event_start_block: int | None = Field(
+        default=None, validation_alias=AliasChoices("EVENT_START_BLOCK", "SEALQUERY_EVENT_START_BLOCK")
+    )
+    event_blocks_per_sync: int = Field(
+        default=20, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
+    )
     worker_poll_seconds: float = Field(
         default=2.0,
         validation_alias=AliasChoices("WORKER_POLL_SECONDS", "SEALQUERY_WORKER_POLL_SECONDS"),

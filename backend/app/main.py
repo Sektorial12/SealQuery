@@ -115,6 +115,13 @@ def usage(db: Session = Depends(get_db)) -> dict:
     return {"agent": settings.agent_account, "count": len(items), "queries": items}
 
 
+@app.get("/api/events")
+def events(limit: int = 50, db: Session = Depends(get_db)) -> dict:
+    limit = min(max(limit, 1), 200)
+    items = services.list_events(db, limit)
+    return {"count": len(items), "events": items}
+
+
 @app.post("/api/query", status_code=status.HTTP_202_ACCEPTED)
 def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
     if not rate_limiter.allow(_identity(request)):
