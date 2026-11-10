@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-11-10
+
+- Added database readiness checks and PostgreSQL indexes.
+- Added guarded PostgreSQL backup/restore scripts.
+- Added Prometheus metrics and worker/indexer heartbeats.
+- Added worker/indexer stale-service alerts.
+
 ## 0.3.0 — 2026-11-10
 
 - Added the Next.js product app: landing, agent console, datasets, queries,
