@@ -103,6 +103,10 @@ def dataset_state(dataset_id: str, computation_id: str) -> dict:
             for method, args in calls
         ]
         dataset, computation, quote, budget = [future.result() for future in futures]
+    today = int(time.time() // 86_400)
+    if int(budget.get("day", 0)) != today:
+        budget = {"day": today, "count": 0}
+    limit = int(dataset.get("budget_per_day", 0))
     return {
         "dataset_id": dataset_id,
         "computation_id": computation_id,
@@ -110,6 +114,8 @@ def dataset_state(dataset_id: str, computation_id: str) -> dict:
         "computation": computation,
         "quote": quote,
         "budget": budget,
+        "budget_limit": limit,
+        "budget_exhausted": limit > 0 and int(budget.get("count", 0)) >= limit,
     }
 
 
@@ -172,6 +178,8 @@ def _build_snapshot(db: Session) -> dict:
             try:
                 datasets.append(future.result())
             except Exception as error:
+                if "dataset not found" in str(error):
+                    continue
                 datasets.append(
                     {
                         "dataset_id": dataset_id,
@@ -716,6 +724,21 @@ def reconcile_jobs(db: Session) -> int:
             elif query.get("status") == "refunded":
                 job.status = "refunded"
                 upsert_query(db, job.query_id, query, job.tx_hash, None, None)
+            elif query.get("status") == "pending":
+                try:
+                    job.refund_tx = agent_client.near_call(
+                        settings.contract_account,
+                        "refund_query",
+                        {"query_id": job.query_id},
+                        settings.agent_account,
+                        "0 NEAR",
+                    )
+                    job.status = "refunded"
+                    upsert_query(
+                        db, job.query_id, query, job.tx_hash, None, job.refund_tx
+                    )
+                except Exception:
+                    _job_fail(db, job, "job timed out waiting for OutLayer")
             elif query.get("status") == "ready":
                 proof, proof_output = agent_client.verify_attestation(
                     job.tx_hash or "", None

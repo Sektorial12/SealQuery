@@ -79,7 +79,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between text-[10px] text-faint">
-                <span>task 30170 · TCB UpToDate</span>
+                <span>live testnet proof · TCB UpToDate</span>
                 <Link href="/app/proofs" className="text-accent">open proof explorer →</Link>
               </div>
             </div>

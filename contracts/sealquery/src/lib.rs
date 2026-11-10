@@ -118,6 +118,9 @@ impl SealQuery {
         if bps > 1_000 {
             env::panic_str("protocol fee cannot exceed 10%");
         }
+        if self.next_query_id > 1 {
+            env::panic_str("cannot change protocol fee after queries");
+        }
         self.protocol_fee_bps = bps;
     }
 
@@ -149,6 +152,7 @@ impl SealQuery {
         reward_yocto: U128,
         budget_per_day: u32,
     ) {
+        self.assert_owner();
         let caller = env::predecessor_account_id();
         if self.datasets.contains_key(&dataset_id) {
             env::panic_str("dataset already exists");
@@ -184,6 +188,49 @@ impl SealQuery {
                 "version": "2.0.0",
                 "event": "dataset_registered",
                 "data": [{"dataset_id": dataset_id, "owner": caller}],
+            })
+        ));
+    }
+
+    pub fn remove_dataset(&mut self, dataset_id: String) {
+        self.assert_owner();
+        self.dataset(&dataset_id);
+        if let Some(ids) = self.queries_by_dataset.get(&dataset_id) {
+            for query_id in ids {
+                if let Some(query) = self.queries.get(query_id) {
+                    if query.status == "pending" || query.status == "ready" {
+                        env::panic_str("cannot remove a dataset with open queries");
+                    }
+                }
+            }
+        }
+        self.datasets.remove(&dataset_id);
+        self.computations
+            .retain(|_, computation| computation.dataset_id != dataset_id);
+        self.queries_by_dataset.remove(&dataset_id);
+        self.budgets
+            .retain(|key, _| !key.ends_with(&format!(":{dataset_id}")));
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({
+                "standard": "sealquery",
+                "version": "2.0.0",
+                "event": "dataset_removed",
+                "data": [{"dataset_id": dataset_id}],
+            })
+        ));
+    }
+
+    pub fn reset_budget(&mut self, agent: AccountId, dataset_id: String) {
+        self.assert_owner();
+        self.budgets.remove(&budget_key(&agent, &dataset_id));
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({
+                "standard": "sealquery",
+                "version": "2.0.0",
+                "event": "budget_reset",
+                "data": [{"agent": agent, "dataset_id": dataset_id}],
             })
         ));
     }
@@ -493,7 +540,61 @@ impl SealQuery {
         if query.status != "ready" {
             env::panic_str("query result is not ready");
         }
-        let dataset = self.dataset(&query.dataset_id);
+        self.settle(query_id, &query.dataset_id)
+    }
+
+    pub fn settle_query(&mut self, query_id: u64) -> Promise {
+        let query = match self.queries.get(&query_id) {
+            Some(query) => query.clone(),
+            None => env::panic_str("query not found"),
+        };
+        if query.status != "ready" {
+            env::panic_str("query result is not ready");
+        }
+        let timed_out = env::block_height() > query.created_block + QUERY_TIMEOUT_BLOCKS;
+        if !timed_out {
+            env::panic_str("query has not timed out");
+        }
+        self.settle(query_id, &query.dataset_id)
+    }
+
+    pub fn refund_query(&mut self, query_id: u64) -> Promise {
+        let agent = env::predecessor_account_id();
+        let query = match self.queries.get(&query_id) {
+            Some(query) => query.clone(),
+            None => env::panic_str("query not found"),
+        };
+        if query.agent != agent {
+            env::panic_str("only the requesting agent can refund");
+        }
+        if query.status == "ready" {
+            env::panic_str("ready query must be settled, not refunded");
+        }
+        if query.status == "settled" || query.status == "refunded" {
+            env::panic_str("query already final");
+        }
+        let timed_out = env::block_height() > query.created_block + QUERY_TIMEOUT_BLOCKS;
+        if query.status != "failed" && !timed_out {
+            env::panic_str("query is not failed and has not timed out");
+        }
+        if let Some(stored) = self.queries.get_mut(&query_id) {
+            stored.status = "refunded".to_string();
+            stored.result = None;
+        }
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({
+                "standard": "sealquery",
+                "version": "2.0.0",
+                "event": "query_refunded",
+                "data": [{"query_id": query_id, "agent": query.agent, "amount_yocto": query.deposit_yocto}],
+            })
+        ));
+        Promise::new(query.agent).transfer(NearToken::from_yoctonear(query.deposit_yocto.0))
+    }
+
+    fn settle(&mut self, query_id: u64, dataset_id: &str) -> Promise {
+        let dataset = self.dataset(dataset_id);
         if let Some(stored) = self.queries.get_mut(&query_id) {
             stored.status = "settled".to_string();
         }
@@ -510,37 +611,6 @@ impl SealQuery {
             })
         ));
         Promise::new(dataset.owner).transfer(NearToken::from_yoctonear(payout))
-    }
-
-    pub fn refund_query(&mut self, query_id: u64) -> Promise {
-        let agent = env::predecessor_account_id();
-        let query = match self.queries.get(&query_id) {
-            Some(query) => query.clone(),
-            None => env::panic_str("query not found"),
-        };
-        if query.agent != agent {
-            env::panic_str("only the requesting agent can refund");
-        }
-        if query.status == "settled" || query.status == "refunded" {
-            env::panic_str("query already final");
-        }
-        let timed_out = env::block_height() > query.created_block + QUERY_TIMEOUT_BLOCKS;
-        if query.status != "failed" && !timed_out {
-            env::panic_str("query is not failed and has not timed out");
-        }
-        if let Some(stored) = self.queries.get_mut(&query_id) {
-            stored.status = "refunded".to_string();
-        }
-        env::log_str(&format!(
-            "EVENT_JSON:{}",
-            json!({
-                "standard": "sealquery",
-                "version": "2.0.0",
-                "event": "query_refunded",
-                "data": [{"query_id": query_id, "agent": query.agent, "amount_yocto": query.deposit_yocto}],
-            })
-        ));
-        Promise::new(query.agent).transfer(NearToken::from_yoctonear(query.deposit_yocto.0))
     }
 
     pub fn get_dataset(&self, dataset_id: String) -> Dataset {
@@ -1006,7 +1076,161 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "only the contract owner can call this")]
+    fn rejects_dataset_registration_from_non_owner() {
+        let (mut contract, _owner) = setup();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(account("attacker.testnet"))
+            .build());
+        register_dataset(&mut contract, &account("attacker.testnet"));
+    }
+
+    #[test]
+    #[should_panic(expected = "ready query must be settled, not refunded")]
+    fn rejects_refund_of_ready_query_after_timeout() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        ready_query(&mut contract, &agent);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(agent)
+            .block_height(1_000)
+            .build());
+        let _ = contract.refund_query(1);
+    }
+
+    #[test]
+    fn refunds_pending_query_after_timeout() {
+        let (mut contract, _owner) = setup();
+        let agent = account("agent.testnet");
+        contract.queries.insert(
+            1,
+            Query {
+                agent: agent.clone(),
+                dataset_id: "retail_v1".to_string(),
+                computation_id: "spend_growth_v1".to_string(),
+                deposit_yocto: U128(20_000_000_000_000_000_000_000),
+                status: "pending".to_string(),
+                result: None,
+                created_block: 0,
+            },
+        );
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(agent)
+            .block_height(201)
+            .build());
+        let _ = contract.refund_query(1);
+        assert_eq!(contract.get_query(1).status, "refunded");
+    }
+
+    #[test]
+    fn refunds_failed_query() {
+        let (mut contract, _owner) = setup();
+        let agent = account("agent.testnet");
+        contract.queries.insert(
+            1,
+            Query {
+                agent: agent.clone(),
+                dataset_id: "retail_v1".to_string(),
+                computation_id: "spend_growth_v1".to_string(),
+                deposit_yocto: U128(20_000_000_000_000_000_000_000),
+                status: "failed".to_string(),
+                result: None,
+                created_block: 0,
+            },
+        );
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(agent)
+            .build());
+        let _ = contract.refund_query(1);
+        assert_eq!(contract.get_query(1).status, "refunded");
+    }
+
+    #[test]
+    fn failed_callback_marks_query_failed() {
+        let (mut contract, _owner) = setup();
+        contract.queries.insert(
+            1,
+            Query {
+                agent: account("agent.testnet"),
+                dataset_id: "retail_v1".to_string(),
+                computation_id: "spend_growth_v1".to_string(),
+                deposit_yocto: U128(20_000_000_000_000_000_000_000),
+                status: "pending".to_string(),
+                result: None,
+                created_block: 0,
+            },
+        );
+        testing_env!(
+            VMContextBuilder::new().build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![PromiseResult::Failed],
+        );
+        contract.on_query_result(1);
+        assert_eq!(contract.get_query(1).status, "failed");
+    }
+
+    #[test]
+    fn settles_ready_query_after_timeout() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        ready_query(&mut contract, &agent);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(account("settler.testnet"))
+            .block_height(201)
+            .build());
+        let _ = contract.settle_query(1);
+        assert_eq!(contract.get_query(1).status, "settled");
+    }
+
+    #[test]
+    #[should_panic(expected = "query result is not ready")]
+    fn rejects_accept_replay() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        ready_query(&mut contract, &agent);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(agent)
+            .build());
+        let _ = contract.accept_result(1);
+        let _ = contract.accept_result(1);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot change protocol fee after queries")]
+    fn rejects_protocol_fee_change_after_query() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        contract.next_query_id = 2;
+        contract.set_protocol_fee_bps(100);
+    }
+
+    #[test]
+    fn owner_can_reset_budget_and_remove_dataset() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        testing_env!(VMContextBuilder::new()
+            .block_timestamp(86_400_000_000_000)
+            .build());
+        contract.charge_budget(&agent, "retail_v1", 20);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner)
+            .build());
+        contract.reset_budget(agent.clone(), "retail_v1".to_string());
+        assert_eq!(contract.get_budget(agent, "retail_v1".to_string()).count, 0);
+        contract.remove_dataset("retail_v1".to_string());
+        assert_eq!(contract.get_dataset_count(), 0);
+        assert_eq!(contract.get_computation_count(), 0);
+    }
+
+    #[test]
     fn version_is_exposed() {
-        assert_eq!(SealQuery::version(), "0.2.1");
+        assert_eq!(SealQuery::version(), "0.2.2");
     }
 }

@@ -39,11 +39,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       SEALQUERY_API_KEY: ${SEALQUERY_API_KEY:-}
       SEALQUERY_STATE_TTL_SECONDS: ${SEALQUERY_STATE_TTL_SECONDS:-15}
-      NEAR_ACCESS_KEY_FILE: /run/secrets/near-access-key.json
+      TRUST_PROXY_HEADERS: "1"
       PROOF_DIR: data/proofs
     volumes:
       - ./data:/app/data
-      - ${NEAR_ACCESS_KEY_FILE:?set NEAR_ACCESS_KEY_FILE}:/run/secrets/near-access-key.json:ro
     depends_on:
       postgres:
         condition: service_healthy

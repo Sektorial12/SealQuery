@@ -52,6 +52,9 @@ export function QueryConsole() {
   const inFlight = Boolean(jobId) && (!job || !terminal);
   const running = mutation.isPending || inFlight;
   const paused = Boolean(state?.paused);
+  const exhausted = selected
+    ? selected.budget_exhausted ?? selected.budget.count >= selected.dataset.budget_per_day
+    : false;
 
   useEffect(() => {
     if (!terminal) return;
@@ -68,7 +71,7 @@ export function QueryConsole() {
   }
 
   function run(mode: "normal" | "rejected") {
-    if (!selected?.dataset || running || paused) return;
+    if (!selected?.dataset || running || paused || exhausted) return;
     setJobId(null);
     mutation.reset();
     mutation.mutate({
@@ -143,8 +146,9 @@ export function QueryConsole() {
               <span className="ml-2 text-xs font-normal text-muted">· {selected.computation_id}</span>
             </h2>
           </div>
-          <span className="pill">
+          <span className={cn("pill", exhausted && "pill-danger")}>
             {selected.budget.count}/{selected.dataset.budget_per_day} today
+            {exhausted ? " · exhausted" : ""}
           </span>
         </div>
 
@@ -158,13 +162,13 @@ export function QueryConsole() {
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button type="button" className="btn btn-primary flex-1" disabled={running || paused} onClick={() => run("normal")}>
-            <Play size={15} /> {mutation.isPending ? "Queueing…" : running ? (job?.status === "queued" ? "Queued…" : "Running attested query…") : "Run query"}
+          <button type="button" className="btn btn-primary flex-1" disabled={running || paused || exhausted} onClick={() => run("normal")}>
+            <Play size={15} /> {exhausted ? "Daily budget exhausted" : mutation.isPending ? "Queueing…" : running ? (job?.status === "queued" ? "Queued…" : "Running attested query…") : "Run query"}
           </button>
           <button
             type="button"
             className="btn btn-ghost sm:w-auto"
-            disabled={running || paused}
+            disabled={running || paused || exhausted}
             onClick={() => run("rejected")}
           >
             <ShieldAlert size={14} /> Test rejected query
@@ -178,6 +182,11 @@ export function QueryConsole() {
         {paused ? (
           <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
             Contract is paused. New queries are rejected until the owner unpauses.
+          </div>
+        ) : exhausted ? (
+          <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            The demo privacy budget is exhausted. It resets at UTC midnight; the
+            contract owner can reset the testnet demo budget sooner.
           </div>
         ) : null}
 
@@ -319,7 +328,7 @@ function Result({
     <div className="mt-5 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="eyebrow">Authorized result</p>
+          <p className="eyebrow">Attested aggregate · public result</p>
           <h3 className="mt-1 text-base font-semibold">
             {result.dataset_id} aggregate <span className="text-xs font-normal text-muted">#{result.query_id}</span>
           </h3>

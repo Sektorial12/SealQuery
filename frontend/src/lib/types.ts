@@ -41,6 +41,8 @@ export type DatasetState = {
   computation: Computation;
   quote: Quote;
   budget: Budget;
+  budget_limit?: number;
+  budget_exhausted?: boolean;
   error?: string;
 };
 

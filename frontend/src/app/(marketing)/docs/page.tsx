@@ -166,7 +166,7 @@ API_URL=http://127.0.0.1:8000 pnpm dev`}
             </p>
             <div className="code-block mt-4">{`cp .env.example .env
 # fill CONTRACT_ACCOUNT, AGENT_ACCOUNT, SEALQUERY_API_KEY,
-# NEAR_CREDENTIALS_DIR
+# NEAR_ACCESS_KEY_FILE
 docker compose up --build`}</div>
             <p className="mt-2 text-[10px] text-faint">Open http://127.0.0.1:8080. Caddy routes /api to FastAPI and the rest to Next.js.</p>
           </section>

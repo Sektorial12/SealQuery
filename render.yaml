@@ -4,8 +4,8 @@
 # Required dashboard setup:
 # - Neon Postgres -> DATABASE_URL
 # - Upstash Redis -> REDIS_URL
-# - Render secret file near-access-key.json on BOTH sealquery-api and
-#   sealquery-worker -> /etc/secrets/near-access-key.json
+# - Render secret file near-access-key.json on sealquery-worker only ->
+#   /etc/secrets/near-access-key.json
 # - Set API_URL on sealquery-web to https://<sealquery-api>.onrender.com
 services:
   - type: web
@@ -30,8 +30,6 @@ services:
         value: https://rpc.testnet.fastnear.com
       - key: OUTLAYER_API
         value: https://testnet-api.outlayer.ai
-      - key: NEAR_ACCESS_KEY_FILE
-        value: /etc/secrets/near-access-key.json
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -40,6 +38,8 @@ services:
         generateValue: true
       - key: SEALQUERY_STATE_TTL_SECONDS
         value: "15"
+      - key: TRUST_PROXY_HEADERS
+        value: "1"
       - key: PROOF_DIR
         value: data/proofs
 

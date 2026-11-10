@@ -43,7 +43,7 @@ export function DatasetTile({
       <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
         <Meta label="Owner" value={short(entry.dataset.owner, 10, 8)} />
         <Meta label="Owner reward" value={`${formatNear(entry.dataset.reward_yocto)} NEAR`} />
-        <Meta label="Budget" value={`${entry.budget.count}/${entry.dataset.budget_per_day} today`} />
+        <Meta label="Budget" value={`${entry.budget.count}/${entry.dataset.budget_per_day}${entry.budget_exhausted ? " · exhausted" : " today"}`} />
         <Meta label="Dataset hash" value={short(entry.dataset.data_hash, 10, 8)} />
       </div>
 

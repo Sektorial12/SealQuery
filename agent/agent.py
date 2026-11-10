@@ -26,6 +26,42 @@ NEAR_ACCESS_KEY_FILE = os.environ.get("NEAR_ACCESS_KEY_FILE")
 RPC_CONCURRENCY = max(1, int(os.environ.get("NEAR_RPC_CONCURRENCY", "3")))
 _rpc_semaphore = threading.Semaphore(RPC_CONCURRENCY)
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _tx_failure(tx_hash: str, signer: str) -> str:
+    try:
+        response = requests.post(
+            RPC_URL,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "EXPERIMENTAL_tx_status",
+                "params": [tx_hash, signer],
+            },
+            timeout=20,
+        )
+        payload = response.json()
+        failure = payload.get("result", {}).get("status", {}).get("Failure")
+        if not failure:
+            return "transaction failed"
+        action = failure.get("ActionError", {})
+        kind = action.get("kind", {})
+        detail = (
+            kind.get("FunctionCallError", {}).get("ExecutionError")
+            or action.get("kind", {}).get("ExecutionError")
+            or json.dumps(failure)[:300]
+        )
+        return _ANSI_RE.sub("", str(detail))[:500]
+    except Exception:
+        return "transaction failed"
+
+
+def _raise_failure(tx_hash: str | None, signer: str) -> None:
+    detail = _tx_failure(tx_hash, signer) if tx_hash else "near CLI error"
+    raise RuntimeError(f"near transaction failed: {detail}")
+
+
 
 def rpc_view(contract: str, method: str, args: dict) -> dict:
     encoded = base64.b64encode(json.dumps(args).encode()).decode()
@@ -95,11 +131,11 @@ def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) 
         command.extend(["sign-with-keychain", "send"])
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
     output = completed.stdout + completed.stderr
-    if completed.returncode != 0:
-        raise RuntimeError(output)
     match = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
+    if completed.returncode != 0:
+        _raise_failure(match.group(1) if match else None, agent)
     if not match:
-        raise RuntimeError(f"transaction id not found in output:\n{output}")
+        raise RuntimeError("transaction id not found in near CLI output")
     return match.group(1)
 
 
@@ -146,11 +182,11 @@ def request_query(contract: str, agent: str, dataset: str, computation: str, par
         command.extend(["sign-with-keychain", "send"])
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
     output = completed.stdout + completed.stderr
-    if completed.returncode != 0:
-        raise RuntimeError(output)
     tx_hash = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
+    if completed.returncode != 0:
+        _raise_failure(tx_hash.group(1) if tx_hash else None, agent)
     if not tx_hash:
-        raise RuntimeError(f"transaction id not found in output:\n{output}")
+        raise RuntimeError("transaction id not found in near CLI output")
     return parse_query_id(output), tx_hash.group(1)
 
 
