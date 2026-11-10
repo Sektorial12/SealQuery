@@ -25,7 +25,7 @@ def hit(url: str, timeout: float) -> float | Exception:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://127.0.0.1:8080/api/state")
+    parser.add_argument("--url", default="http://127.0.0.1:8000/api/state")
     parser.add_argument("--requests", type=int, default=10)
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=120.0)

@@ -342,6 +342,59 @@ python3 scripts/verify_query.py \
   - Threat model and privacy review are in `docs/threat-model.md`.
   - No critical finding in the testnet scope; production gaps are documented.
 
+## Production web app validation
+
+- `frontend/` is a Next.js 16 + TypeScript + Tailwind app that proxies `/api/*`
+  to the Flask API.
+- `pnpm lint` and `pnpm build` pass.
+- Routes verified in headless Chromium: `/`, `/pricing`, `/security`, `/status`,
+  `/docs`, `/app`, `/app/datasets`, `/app/datasets/retail_v1`, `/app/queries`,
+  `/app/queries/11`, `/app/proofs`, `/app/owner`, `/app/agent`.
+- Browser query `11` through the Next.js app:
+  - Request transaction: `CEgQY3Yy17kFPsemG6KmmkQzjBSvorBzB1L5ELLm2bQm`
+  - Acceptance transaction: `E79o9QJ7ULdebmgzUF8twwxXcyfsCVr9FzoWGCHEY2bn`
+  - OutLayer task: `30292`
+  - Attestation: `PROVEN`, TCB `UpToDate`
+  - Status: `settled`
+- Browser rejected-query path `12`:
+  - Request transaction: `AWXN48inL2QCPRs3XMZ1snfBt2d8yqoPbFyDaSuuL3k1`
+  - Refund transaction: `H8bjSYq5jxwaxRSPUD7A8P9RUaphb47zegAb5ywV6hzi`
+  - Status: `refunded`; no aggregate released
+- The app still uses the Flask API. FastAPI, Postgres indexing, Docker Compose,
+  and the hosted deployment are not yet done.
+
+## FastAPI and Postgres validation
+
+- `backend/` FastAPI service uses SQLAlchemy + Postgres (SQLite for local dev),
+  Redis-backed rate limits/idempotency when configured, and a separate indexer.
+- Local Postgres 16 test:
+  - Created database `sealquery`; `init_db()` created `datasets` and `queries`.
+  - Indexer synchronized 2 datasets and 15 queries.
+  - `GET /api/queries?limit=2` returned the latest IDs `14`, `15` with statuses
+    `settled`, `refunded`.
+- FastAPI query `13`:
+  - Request transaction: `4EbQGQ79bdJ9kAX7LvS8oEQS8ihdZnYpS3wYx2xnDUvA`
+  - Acceptance transaction: `DFCAETdS9ofWXocpjLbeatqnFhxiPCkdzetM4pNhd3Cw`
+  - OutLayer task: `30304`; attestation `PROVEN`; TCB `UpToDate`.
+- FastAPI rejected query `15`:
+  - Request transaction: `3KkHE5fNqu4ygPWJDE9m6sNAC8pKds3L4fuHtG3N8RWt`
+  - Refund transaction: `EX4f86E4jWSJYv6p3VWwsxPNqcZjmGiuxCfZRG4s8Ydj`
+  - Status: `refunded`.
+- Next.js dev proxy tested against FastAPI on `:8000`; MCP smoke test and
+  `get_query`/`verify_query` passed against FastAPI.
+- Docker Compose runtime validation:
+  - Backend and web images built successfully.
+  - Compose brought up Next.js, FastAPI, indexer, Postgres, Redis, and Caddy.
+  - Caddy app: `http://127.0.0.1:8080/` returned HTTP `200`.
+  - Indexer logged `indexed datasets=2 queries=16`.
+  - Compose query `16`:
+    - Request transaction: `5a5wy2c1aRwDcirgFcSN4Tqngc7fwJYj95UMQRxogt4m`
+    - Acceptance transaction: `7JysUQE6rFvo3FdhH1ee8WofhTcwcPNKQYFRyZECPXQq`
+    - OutLayer task: `31582`; attestation `PROVEN`; TCB `UpToDate`.
+    - Contract/API status: `settled`.
+  - The backend container signed with the mounted access-key file and verified
+    the proof with the built-in `outlayer-verify` binary.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.

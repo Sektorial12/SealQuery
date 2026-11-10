@@ -447,6 +447,45 @@ def metrics():
     )
 
 
+@app.get("/api/queries")
+def queries():
+    limit = min(max(int(request.args.get("limit", "20")), 1), 100)
+    query_ids = agent_client.rpc_view(
+        CONTRACT, "get_queries_for_agent", {"agent": AGENT}
+    )
+    with _query_tx_lock:
+        tx_by_query = dict(_query_tx)
+    records = []
+    for query_id in query_ids[-limit:]:
+        try:
+            record = agent_client.rpc_view(
+                CONTRACT, "get_query", {"query_id": query_id}
+            )
+            records.append(
+                {
+                    "query_id": query_id,
+                    **record,
+                    **tx_by_query.get(query_id, {}),
+                }
+            )
+        except Exception as error:
+            records.append({"query_id": query_id, "error": str(error)})
+    return jsonify({"agent": AGENT, "count": len(records), "queries": records})
+
+
+@app.get("/api/queries/<int:query_id>")
+def query_detail(query_id: int):
+    try:
+        record = agent_client.rpc_view(
+            CONTRACT, "get_query", {"query_id": query_id}
+        )
+    except Exception as error:
+        return jsonify({"ok": False, "error": str(error)}), 404
+    with _query_tx_lock:
+        tx = dict(_query_tx.get(query_id, {}))
+    return jsonify({"query_id": query_id, **record, **tx})
+
+
 @app.get("/api/usage")
 def usage():
     query_ids = agent_client.rpc_view(

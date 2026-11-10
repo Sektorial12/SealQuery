@@ -1,0 +1,112 @@
+name: sealquery
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sealquery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sealquery}
+      POSTGRES_DB: ${POSTGRES_DB:-sealquery}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sealquery} -d ${POSTGRES_DB:-sealquery}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      CONTRACT_ACCOUNT: ${CONTRACT_ACCOUNT:?set CONTRACT_ACCOUNT}
+      AGENT_ACCOUNT: ${AGENT_ACCOUNT:?set AGENT_ACCOUNT}
+      NEAR_NETWORK: ${NEAR_NETWORK:-testnet}
+      NEAR_RPC: ${NEAR_RPC:-https://rpc.testnet.fastnear.com}
+      OUTLAYER_API: ${OUTLAYER_API:-https://testnet-api.outlayer.ai}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sealquery}:${POSTGRES_PASSWORD:-sealquery}@postgres:5432/${POSTGRES_DB:-sealquery}
+      REDIS_URL: redis://redis:6379/0
+      SEALQUERY_API_KEY: ${SEALQUERY_API_KEY:-}
+      SEALQUERY_STATE_TTL_SECONDS: ${SEALQUERY_STATE_TTL_SECONDS:-5}
+      NEAR_ACCESS_KEY_FILE: /run/secrets/near-access-key.json
+      PROOF_DIR: data/proofs
+      LEGACY_TX_FILE: data/query_tx.json
+    volumes:
+      - ./data:/app/data
+      - ${NEAR_ACCESS_KEY_FILE:?set NEAR_ACCESS_KEY_FILE}:/run/secrets/near-access-key.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  indexer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.indexer"]
+    environment:
+      CONTRACT_ACCOUNT: ${CONTRACT_ACCOUNT:?set CONTRACT_ACCOUNT}
+      AGENT_ACCOUNT: ${AGENT_ACCOUNT:?set AGENT_ACCOUNT}
+      NEAR_NETWORK: ${NEAR_NETWORK:-testnet}
+      NEAR_RPC: ${NEAR_RPC:-https://rpc.testnet.fastnear.com}
+      OUTLAYER_API: ${OUTLAYER_API:-https://testnet-api.outlayer.ai}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sealquery}:${POSTGRES_PASSWORD:-sealquery}@postgres:5432/${POSTGRES_DB:-sealquery}
+      REDIS_URL: redis://redis:6379/0
+      INDEXER_INTERVAL_SECONDS: ${INDEXER_INTERVAL_SECONDS:-15}
+      PROOF_DIR: data/proofs
+      LEGACY_TX_FILE: data/query_tx.json
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${CADDY_PORT:-8080}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

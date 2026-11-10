@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 : "${CONTRACT_ACCOUNT:?set CONTRACT_ACCOUNT}"
 : "${OWNER_ACCOUNT:?set OWNER_ACCOUNT}"
-API_URL="${API_URL:-http://127.0.0.1:8080}"
+API_URL="${API_URL:-http://127.0.0.1:8000}"
 
 if [[ "${DRILL_CONFIRM:-}" != "1" ]]; then
   echo "Refusing to pause the live contract. Set DRILL_CONFIRM=1." >&2

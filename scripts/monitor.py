@@ -18,7 +18,7 @@ def fetch(url: str, timeout: float) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://127.0.0.1:8080/api/metrics")
+    parser.add_argument("--url", default="http://127.0.0.1:8000/api/metrics")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--interval", type=float, default=30.0)
     parser.add_argument("--timeout", type=float, default=120.0)

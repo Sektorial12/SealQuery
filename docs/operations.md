@@ -8,7 +8,10 @@ current demo.
 
 - **Contract:** `contract.sealquery-v2-1794194344.testnet`
 - **Agent:** `agent2.sealquery-1794187176.testnet`
-- **API/UI:** `http://127.0.0.1:8080`
+- **FastAPI:** `http://127.0.0.1:8000`
+- **Next.js app:** `http://127.0.0.1:3000`
+- **Compose/Caddy:** `http://127.0.0.1:8080`
+- **Legacy Flask console:** `http://127.0.0.1:8080` (when not using Compose)
 - **OutLayer project:** `sealquery-1794187176.testnet/sealquery-approved`
 - **Proof bundles:** `data/proofs/*.json` (ignored local artifacts)
 
@@ -20,6 +23,8 @@ runs the agent loop server-side; the browser never receives a key.
 ```bash
 python3 scripts/monitor.py --once
 python3 scripts/monitor.py --interval 30
+# Compose/Caddy:
+python3 scripts/monitor.py --url http://127.0.0.1:8080/api/metrics --once
 ```
 
 The monitor polls `GET /api/metrics`. Alerts:
@@ -101,8 +106,10 @@ Pause rejects new queries without affecting existing refunds:
 DRILL_CONFIRM=1 \
 CONTRACT_ACCOUNT="$CONTRACT_ACCOUNT" \
 OWNER_ACCOUNT="$OWNER_ACCOUNT" \
-API_URL=http://127.0.0.1:8080 \
+API_URL=http://127.0.0.1:8000 \
 ./scripts/incident_drill.sh
+
+# Compose: set API_URL=http://127.0.0.1:8080
 ```
 
 The drill pauses, attempts a query, verifies rejection, unpauses, and verifies
@@ -130,7 +137,7 @@ service restoration. It requires `DRILL_CONFIRM=1` to prevent accidental use.
 
 ### API restart or crash
 
-Restart with `./scripts/run_demo.sh` and the required environment. The contract
+Restart with `./scripts/run_backend.sh` (FastAPI) or `./scripts/run_demo.sh` (legacy Flask) and the required environment. The contract
 remains authoritative. In-memory idempotency and rate-limit state is lost on
 restart; clients should retry with a new idempotency key only after checking the
 query history.
@@ -138,6 +145,8 @@ query history.
 ## Secret management
 
 - Local development uses `.env` (ignored) and the NEAR keychain.
+- Container/Render deployments use a mounted access-key JSON file via
+  `NEAR_ACCESS_KEY_FILE`; never bake the key into the image.
 - The OutLayer payment key and compute secret are local environment/CLI
   secrets, never in the repo.
 - Production should use a central secret manager, short-lived credentials, and

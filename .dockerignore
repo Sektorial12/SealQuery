@@ -1,0 +1,13 @@
+.git
+target
+frontend/node_modules
+frontend/.next
+frontend/.env
+backend/.venv
+backend/data
+backend/__pycache__
+data
+*.log
+
+near-access-key.json
+*access-key*.json

@@ -37,6 +37,60 @@ jobs:
       - name: Secret scan
         run: ./scripts/check_secrets.sh
 
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install
+        run: pip install -r backend/requirements.txt
+
+      - name: Compile
+        run: python -m compileall backend/app
+
+      - name: Tests
+        env:
+          CONTRACT_ACCOUNT: contract.testnet
+          AGENT_ACCOUNT: agent.testnet
+          DATABASE_URL: sqlite:////tmp/sealquery-ci.db
+          REDIS_URL: ""
+          INDEXER_ON_STARTUP: "0"
+          PYTHONPATH: backend
+        run: python -m pytest backend/tests -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: frontend
+        run: pnpm lint
+
+      - name: Build
+        working-directory: frontend
+        run: pnpm build
+
   reproducible:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

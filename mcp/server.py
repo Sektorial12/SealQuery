@@ -10,7 +10,7 @@ import uuid
 
 import requests
 
-API_URL = os.environ.get("SEALQUERY_API_URL", "http://127.0.0.1:8080").rstrip("/")
+API_URL = os.environ.get("SEALQUERY_API_URL", "http://127.0.0.1:8000").rstrip("/")
 API_KEY = os.environ.get("SEALQUERY_API_KEY", "")
 PROTOCOL_VERSION = "2024-11-05"
 

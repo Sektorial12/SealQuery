@@ -1,0 +1,1 @@
+"""SealQuery FastAPI service."""

@@ -54,7 +54,7 @@ def main() -> int:
     args = parser.parse_args()
 
     env = os.environ.copy()
-    env.setdefault("SEALQUERY_API_URL", "http://127.0.0.1:8080")
+    env.setdefault("SEALQUERY_API_URL", "http://127.0.0.1:8000")
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "mcp" / "server.py")],
         stdin=subprocess.PIPE,

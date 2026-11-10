@@ -43,3 +43,7 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# NEAR access key files (never commit)
+*access-key*.json
+near-access-key*.json

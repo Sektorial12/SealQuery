@@ -22,6 +22,7 @@ import requests
 RPC_URL = os.environ.get("NEAR_RPC", "https://rpc.testnet.fastnear.com")
 OUTLAYER_API = os.environ.get("OUTLAYER_API", "https://testnet-api.outlayer.ai")
 NEAR_NETWORK = os.environ.get("NEAR_NETWORK", "testnet")
+NEAR_ACCESS_KEY_FILE = os.environ.get("NEAR_ACCESS_KEY_FILE")
 RPC_CONCURRENCY = max(1, int(os.environ.get("NEAR_RPC_CONCURRENCY", "3")))
 _rpc_semaphore = threading.Semaphore(RPC_CONCURRENCY)
 
@@ -85,9 +86,13 @@ def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) 
         agent,
         "network-config",
         NEAR_NETWORK,
-        "sign-with-keychain",
-        "send",
     ]
+    if NEAR_ACCESS_KEY_FILE:
+        command.extend(
+            ["sign-with-access-key-file", NEAR_ACCESS_KEY_FILE, "send"]
+        )
+    else:
+        command.extend(["sign-with-keychain", "send"])
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
     output = completed.stdout + completed.stderr
     if completed.returncode != 0:
@@ -132,9 +137,13 @@ def request_query(contract: str, agent: str, dataset: str, computation: str, par
         agent,
         "network-config",
         NEAR_NETWORK,
-        "sign-with-keychain",
-        "send",
     ]
+    if NEAR_ACCESS_KEY_FILE:
+        command.extend(
+            ["sign-with-access-key-file", NEAR_ACCESS_KEY_FILE, "send"]
+        )
+    else:
+        command.extend(["sign-with-keychain", "send"])
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
     output = completed.stdout + completed.stderr
     if completed.returncode != 0:

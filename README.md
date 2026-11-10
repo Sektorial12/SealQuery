@@ -41,16 +41,22 @@ OutLayer provides Intel TDX execution and per-execution attestations. NEAR provi
 contracts/sealquery/   NEAR contract
 workload/              probe and approved WASI computation
 agent/                 agent client
-api/                   demo API and machine agent endpoint
-web/                   static query frontend
+api/                   legacy Flask API and demo endpoint
+backend/               FastAPI service, indexer, Postgres models
+frontend/              Next.js product web app
+web/                   legacy Flask-served demo console
 mcp/                   MCP stdio server
+compose.yaml           Next.js + FastAPI + Postgres + Redis + Caddy
+render.yaml            Render hosted mirror (Neon + Upstash)
+Caddyfile              Compose reverse proxy
 scripts/               dataset preparation, query verification, smoke tests
-docs/                  evidence log
+docs/                  evidence, operations, threat model
 ```
 
 ## Requirements
 
 - Python 3.11+
+- Node.js 20+ and pnpm 10+ for `frontend/`
 - `curl` and `jq` for the operational scripts
 - Rust 1.99.1 (pinned in `rust-toolchain.toml`)
 - `cargo-near` 0.23.0
@@ -58,9 +64,10 @@ docs/                  evidence log
 - `wasmtime` 50.0.1
 - `outlayer` CLI 0.2.2
 - `outlayer-verify` 0.1.0
-- Python packages: `Flask`, `requests`
+- Python packages: `api/requirements.txt` (Flask) and `backend/requirements.txt` (FastAPI)
 - NEAR testnet accounts: deployer, contract, data owner, agent
 - OutLayer testnet login and a project-restricted payment key
+- On hosts without the NEAR keychain, set `NEAR_ACCESS_KEY_FILE` to a mounted JSON access-key file
 
 ## Quick start
 
@@ -265,9 +272,36 @@ python3 scripts/verify_query.py \
 
 Expected: the contract query record, the result, and `PROVEN`.
 
-## Demo UI
+## Web app
 
-The demo API serves a static frontend and runs the configured demo agent.
+The production-facing app lives in `frontend/` (Next.js + TypeScript). It uses the
+FastAPI service by default; the legacy Flask API remains available at :8080.
+
+```bash
+# terminal 1: FastAPI on :8000
+./scripts/run_backend.sh
+
+# terminal 2: Next.js on :3000
+cd frontend
+pnpm install
+API_URL=http://127.0.0.1:8000 pnpm dev
+```
+
+Open `http://127.0.0.1:3000`.
+
+The app includes the landing page, live network stats, agent console, dataset
+and query detail pages, proof explorer, owner/agent surfaces, pricing, status,
+security, and docs. The browser never holds a key; queries are executed by the
+server-side demo agent.
+
+The legacy demo console remains at `http://127.0.0.1:8080` (served from `web/`)
+as a fallback while the Next.js app reaches parity.
+
+## Demo console and API
+
+The legacy Flask console is at :8080 and the FastAPI service is at :8000. Both
+expose the same core query/proof endpoints; the FastAPI service is the
+production API and the Flask console is a fallback UI.
 
 ```bash
 export CONTRACT_ACCOUNT='<v2 contract>'
@@ -294,6 +328,8 @@ API endpoints:
 - `GET /api/state` — contract state, datasets, budgets, recent queries
 - `GET /api/metrics` — balances, query status, budgets, and alerts
 - `GET /api/usage` — query history for the configured agent
+- `GET /api/queries` — indexed query history
+- `GET /api/queries/<id>` — one indexed query record
 - `POST /api/query` — browser-facing demo query
 - `POST /api/v1/query` — machine query; requires `X-API-Key` when configured
 - `GET /api/v1/query/<id>` — machine query record
@@ -307,9 +343,9 @@ machine endpoint. The browser endpoint stays same-origin and key-free.
 
 ```bash
 export SEALQUERY_API_KEY='local-demo-key'
-SEALQUERY_API_KEY="$SEALQUERY_API_KEY" ./scripts/run_demo.sh
+./scripts/run_backend.sh
 
-curl -s http://127.0.0.1:8080/api/v1/query \
+curl -s http://127.0.0.1:8000/api/v1/query \
   -H "X-API-Key: $SEALQUERY_API_KEY" \
   -H 'Idempotency-Key: demo-query-1' \
   -H 'Content-Type: application/json' \
@@ -332,7 +368,7 @@ enforces a per-key rate limit (`SEALQUERY_RATE_LIMIT_PER_MINUTE`, default 5).
       "command": "python3",
       "args": ["/absolute/path/to/code/mcp/server.py"],
       "env": {
-        "SEALQUERY_API_URL": "http://127.0.0.1:8080",
+        "SEALQUERY_API_URL": "http://127.0.0.1:8000",
         "SEALQUERY_API_KEY": "<same local key>"
       }
     }
@@ -363,7 +399,7 @@ unpauses it:
 DRILL_CONFIRM=1 \
 CONTRACT_ACCOUNT="$CONTRACT_ACCOUNT" \
 OWNER_ACCOUNT="$OWNER_ACCOUNT" \
-API_URL=http://127.0.0.1:8080 \
+API_URL=http://127.0.0.1:8000 \
 ./scripts/incident_drill.sh
 ```
 

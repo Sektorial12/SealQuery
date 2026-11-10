@@ -10,7 +10,7 @@ Start the demo API first:
 export CONTRACT_ACCOUNT='<v2 contract>'
 export AGENT_ACCOUNT='<agent account>'
 export SEALQUERY_API_KEY='<local secret>'
-./scripts/run_demo.sh
+./scripts/run_backend.sh
 ```
 
 ## Client configuration
@@ -24,7 +24,7 @@ Claude Desktop, Cursor, or another MCP client can launch the server with:
       "command": "python3",
       "args": ["/absolute/path/to/code/mcp/server.py"],
       "env": {
-        "SEALQUERY_API_URL": "http://127.0.0.1:8080",
+        "SEALQUERY_API_URL": "http://127.0.0.1:8000",
         "SEALQUERY_API_KEY": "<same local secret>"
       }
     }
