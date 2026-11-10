@@ -331,7 +331,7 @@ Set `SEALQUERY_API_KEY` before starting the service to require an API key on the
 machine endpoint. The browser endpoint stays same-origin and key-free.
 
 ```bash
-export SEALQUERY_API_KEY='local-demo-key'
+export SEALQUERY_API_KEY='<local-demo-key>'
 ./scripts/run_backend.sh
 
 job=$(curl -s http://127.0.0.1:8000/api/v1/query \

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 — 2026-11-10
+
+- Removed empty directories and fixed the frontend Docker build without a `public/` directory.
+- Sanitized local paths and placeholder keys in documentation.
+- Clarified early web evidence versus the current FastAPI hosted path.
+
 ## 0.3.2 — 2026-11-10
 
 - Removed the legacy Flask API and static demo console.

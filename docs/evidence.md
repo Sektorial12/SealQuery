@@ -306,7 +306,7 @@ python3 scripts/verify_query.py \
 
 ## Clean-clone verification
 
-- Clone: `git clone /home/spektor/code/nearhack/code /tmp/opencode/sealquery-clean`
+- Clone: `git clone <repository> /tmp/sealquery-clean`
 - `cargo fmt --all -- --check`: passed
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed
 - `cargo test --workspace`: 8 contract tests and 5 workload tests passed
@@ -342,10 +342,11 @@ python3 scripts/verify_query.py \
   - Threat model and privacy review are in `docs/threat-model.md`.
   - No critical finding in the testnet scope; production gaps are documented.
 
-## Production web app validation
+## Early web app validation (pre-FastAPI prototype)
 
-- `frontend/` is a Next.js 16 + TypeScript + Tailwind app that proxies `/api/*`
-  to FastAPI.
+- This early run used the Flask prototype; current FastAPI/hosted evidence is
+  below.
+- `frontend/` is a Next.js 16 + TypeScript + Tailwind app.
 - `pnpm lint` and `pnpm build` pass.
 - Routes verified in headless Chromium: `/`, `/pricing`, `/security`, `/status`,
   `/docs`, `/app`, `/app/datasets`, `/app/datasets/retail_v1`, `/app/queries`,

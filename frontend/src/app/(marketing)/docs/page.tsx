@@ -79,7 +79,7 @@ export default function DocsPage() {
 {`# terminal 1: FastAPI
 export CONTRACT_ACCOUNT='<v2 contract>'
 export AGENT_ACCOUNT='<agent account>'
-export SEALQUERY_API_KEY='local-demo-key'
+export SEALQUERY_API_KEY='<local-demo-key>'
 ./scripts/run_backend.sh
 
 # terminal 2: Next.js app
