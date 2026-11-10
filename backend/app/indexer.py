@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import time
 
+from sqlalchemy.exc import IntegrityError
+
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .services import heartbeat, sync_datasets, sync_events, sync_queries
@@ -27,6 +29,11 @@ def main() -> None:
                 flush=True,
             )
             heartbeat(db, "indexer", f"event_blocks={events}")
+        except IntegrityError as error:
+            db.rollback()
+            print(f"indexer integrity conflict; retrying: {error}", flush=True)
+            time.sleep(2)
+            continue
         except Exception as error:
             db.rollback()
             print(f"indexer error: {error}", flush=True)

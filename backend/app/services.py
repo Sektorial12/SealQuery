@@ -14,6 +14,7 @@ from typing import Any
 
 import requests
 from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -943,7 +944,13 @@ def sync_events(db: Session) -> int:
         start = settings.event_start_block if settings.event_start_block is not None else latest
         checkpoint = IndexerCheckpoint(name="events", last_block=max(0, start - 1))
         db.add(checkpoint)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            checkpoint = db.get(IndexerCheckpoint, "events")
+            if checkpoint is None:
+                raise
 
     if checkpoint.last_block >= latest:
         return 0
@@ -984,7 +991,7 @@ def sync_events(db: Session) -> int:
                     if db.get(EventRecord, event_id):
                         continue
                     data = parsed.get("data") or []
-                    db.add(
+                    db.merge(
                         EventRecord(
                             event_id=event_id,
                             block_height=height,
@@ -1081,14 +1088,22 @@ def owner_summary(db: Session) -> dict:
 
 
 def heartbeat(db: Session, name: str, detail: str = "") -> None:
-    row = db.get(ServiceHeartbeat, name)
-    if row is None:
-        row = ServiceHeartbeat(name=name, detail=detail)
-        db.add(row)
-    else:
-        row.detail = detail
-    row.last_seen = utcnow()
-    db.commit()
+    try:
+        row = db.get(ServiceHeartbeat, name)
+        if row is None:
+            row = ServiceHeartbeat(name=name, last_seen=utcnow(), detail=detail)
+            db.add(row)
+        else:
+            row.detail = detail
+            row.last_seen = utcnow()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        row = db.get(ServiceHeartbeat, name)
+        if row is not None:
+            row.detail = detail
+            row.last_seen = utcnow()
+            db.commit()
 
 
 def service_status(db: Session) -> dict:
