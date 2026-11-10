@@ -95,12 +95,17 @@ Expected: `5 passed`.
 
 ### Reproducible build
 
+The deployed artifact was built from commit `6cf4ce3`. Check out that commit
+first for a bit-identical hash; later commits change only the embedded source
+snapshot metadata.
+
 ```bash
+git checkout 6cf4ce3
 cd contracts/sealquery
 cargo near build reproducible-wasm
 ```
 
-Expected v0.2.1 contract hash: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`, built from commit `6cf4ce3`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
+Expected v0.2.1 contract hash: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 
