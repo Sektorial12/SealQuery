@@ -823,13 +823,34 @@ def list_events(db: Session, limit: int = 50) -> list[dict]:
     ]
 
 
-def _neardata_block(height: int) -> dict | None:
+def _neardata_get(path: str) -> dict | None:
     base = settings.neardata_api.rstrip("/")
-    response = requests.get(f"{base}/v0/block/{height}", timeout=30)
-    if response.status_code == 404:
-        return None
-    response.raise_for_status()
-    return response.json()
+    params = {"apiKey": settings.neardata_api_key} if settings.neardata_api_key else None
+    last_error: Exception | None = None
+    for attempt in range(5):
+        response = requests.get(
+            f"{base}{path}", params=params, timeout=30, allow_redirects=True
+        )
+        if response.status_code == 404:
+            return None
+        if response.status_code == 429 or 500 <= response.status_code < 600:
+            retry_after = response.headers.get("Retry-After")
+            try:
+                delay = float(retry_after) if retry_after else min(30, 2**attempt)
+            except ValueError:
+                delay = min(30, 2**attempt)
+            last_error = RuntimeError(
+                f"Neardata {response.status_code}: {response.text[:200]}"
+            )
+            time.sleep(delay)
+            continue
+        response.raise_for_status()
+        return response.json()
+    raise RuntimeError(f"Neardata request failed after retries: {last_error}")
+
+
+def _neardata_block(height: int) -> dict | None:
+    return _neardata_get(f"/v0/block/{height}")
 
 
 def _apply_event(
@@ -898,9 +919,10 @@ def _apply_event(
 def sync_events(db: Session) -> int:
     """Index NEP-297 events forward from a saved Neardata checkpoint."""
     base = settings.neardata_api.rstrip("/")
-    latest_response = requests.get(f"{base}/v0/last_block/final", timeout=30)
-    latest_response.raise_for_status()
-    latest = int(latest_response.json()["block"]["header"]["height"])
+    latest_payload = _neardata_get("/v0/last_block/final")
+    if not latest_payload:
+        return 0
+    latest = int(latest_payload["block"]["header"]["height"])
 
     checkpoint = db.get(IndexerCheckpoint, "events")
     if checkpoint is None:

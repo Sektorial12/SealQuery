@@ -41,11 +41,15 @@ class Settings(BaseSettings):
     indexer_interval_seconds: int = 15
     indexer_on_startup: bool = False
     neardata_api: str = "https://testnet.neardata.xyz"
+    neardata_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEARDATA_API_KEY", "FASTNEAR_API_KEY"),
+    )
     event_start_block: int | None = Field(
         default=None, validation_alias=AliasChoices("EVENT_START_BLOCK", "SEALQUERY_EVENT_START_BLOCK")
     )
     event_blocks_per_sync: int = Field(
-        default=20, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
+        default=5, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
     )
     worker_poll_seconds: float = Field(
         default=2.0,

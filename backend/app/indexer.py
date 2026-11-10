@@ -23,6 +23,8 @@ def main() -> None:
         except Exception as error:
             db.rollback()
             print(f"indexer error: {error}", flush=True)
+            time.sleep(max(settings.indexer_interval_seconds, 60))
+            continue
         finally:
             db.close()
         time.sleep(settings.indexer_interval_seconds)
