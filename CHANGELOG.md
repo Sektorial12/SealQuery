@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4 — 2026-11-10
+
+- Made event indexing and service heartbeats idempotent under replay/restart races.
+- Indexer now retries integrity conflicts without a 60-second stall.
+
 ## 0.3.3 — 2026-11-10
 
 - Removed empty directories and fixed the frontend Docker build without a `public/` directory.
