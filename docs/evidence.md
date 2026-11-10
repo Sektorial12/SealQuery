@@ -198,6 +198,8 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Added contract tests for late callbacks after refund/settlement, duplicate
   computations, economics overflow, and post-query economics changes.
 - Hosted query `32` after the v0.2.1 upgrade: task `41071`, `PROVEN`, settled.
+- Post-upgrade async incident drill: job `3a78aa87a4eb4535a454af5c9bf55bb3` failed
+  fast with `contract is paused`; pause/unpause finished with `DRILL PASSED`.
 
 ## End-to-end query
 

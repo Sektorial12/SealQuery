@@ -9,6 +9,7 @@
 - Allowlisted browser query datasets and removed synchronous paid routes.
 - Added RPC snapshot fallback, stricter proxy handling, UI attestation retries, and honest proof badges.
 - Updated the async incident drill and p95 calculation.
+- Paused queries now fail before transaction submission.
 
 ## 0.3.4 — 2026-11-10
 
