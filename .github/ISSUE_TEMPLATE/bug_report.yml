@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a reproducible problem in the testnet prototype.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include secrets, access keys, seed phrases, or private data."
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Contract
+        - Workload / TEE
+        - Agent
+        - FastAPI / worker
+        - Indexer
+        - Frontend
+        - MCP
+        - Deployment
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact commands, endpoint, or UI steps.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Contract/query ID, transaction hash, task ID, logs, or screenshots.
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / deployment
+      description: Git commit or hosted URL.

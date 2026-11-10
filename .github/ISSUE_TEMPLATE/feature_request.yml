@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a capability for the testnet prototype.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user/problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the smallest useful implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Success criteria
+      description: What transaction, proof, UI, or test would demonstrate it?
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: Keeps TEE execution and settlement real (no mocks)
+        - label: Does not deliver raw data to the agent
+        - label: Keeps keys out of the browser and repository

@@ -50,7 +50,7 @@ compose.yaml           Next.js + FastAPI + Postgres + Redis + Caddy
 render.yaml            Render hosted mirror (Neon + Upstash)
 Caddyfile              Compose reverse proxy
 scripts/               dataset preparation, query verification, smoke tests
-docs/                  evidence, operations, threat model
+docs/                  architecture, evidence, operations, threat model
 ```
 
 ## Requirements
@@ -412,6 +412,7 @@ API_URL=http://127.0.0.1:8000 \
 ./scripts/incident_drill.sh
 ```
 
+See `docs/architecture.md` for the system diagram and trust boundaries.
 See `docs/operations.md` for monitoring thresholds, SLOs, runbooks, key
 rotation, and the incident drill. See `docs/threat-model.md` for the threat
 model and privacy review.
@@ -517,3 +518,9 @@ Highlights:
 ## License
 
 MIT. See `LICENSE`.
+
+
+## Contributing
+
+See `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`. This is a
+testnet prototype; do not use it with mainnet funds or production data.
