@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -23,6 +23,7 @@ from .models import (
     IndexerCheckpoint,
     JobRecord,
     QueryRecord,
+    ServiceHeartbeat,
     utcnow,
 )
 
@@ -316,6 +317,28 @@ def metrics(db: Session) -> dict:
             }
         )
 
+    service_health = service_status(db)
+    for name in ("worker", "indexer"):
+        info = service_health.get(name)
+        if info is None:
+            alerts.append(
+                {
+                    "severity": "critical" if name == "worker" else "warning",
+                    "code": f"{name}_missing",
+                    "message": f"{name} has not reported a heartbeat.",
+                }
+            )
+            continue
+        if info["stale_seconds"] <= settings.heartbeat_timeout_seconds:
+            continue
+        alerts.append(
+            {
+                "severity": "critical" if name == "worker" else "warning",
+                "code": f"{name}_stale",
+                "message": f"{name} heartbeat is {info['stale_seconds']}s old.",
+            }
+        )
+
     total = len(recent)
     successes = statuses.get("settled", 0) + statuses.get("ready", 0)
     return {
@@ -332,6 +355,7 @@ def metrics(db: Session) -> dict:
         },
         "datasets": datasets,
         "balances": {"agent": agent_balance, "contract": contract_balance},
+        "services": service_health,
         "alerts": alerts,
     }
 
@@ -1070,3 +1094,96 @@ def owner_summary(db: Session) -> dict:
         )
 
     return {"owners": list(owners.values()), "datasets": len(datasets), "queries": len(queries)}
+
+
+def heartbeat(db: Session, name: str, detail: str = "") -> None:
+    row = db.get(ServiceHeartbeat, name)
+    if row is None:
+        row = ServiceHeartbeat(name=name, detail=detail)
+        db.add(row)
+    else:
+        row.detail = detail
+    row.last_seen = utcnow()
+    db.commit()
+
+
+def service_status(db: Session) -> dict:
+    rows = db.query(ServiceHeartbeat).all()
+    now = utcnow()
+    result: dict[str, dict] = {}
+    for row in rows:
+        last_seen = row.last_seen
+        if last_seen.tzinfo is None:
+            last_seen = last_seen.replace(tzinfo=now.tzinfo)
+        result[row.name] = {
+            "last_seen": last_seen.isoformat(),
+            "stale_seconds": max(0, int((now - last_seen).total_seconds())),
+            "detail": row.detail,
+        }
+    return result
+
+
+def _label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def prometheus_metrics(db: Session) -> str:
+    lines = [
+        "# HELP sealquery_paused Whether the contract is paused.",
+        "# TYPE sealquery_paused gauge",
+    ]
+    snap = snapshot(db)
+    lines.append(f"sealquery_paused {1 if snap['paused'] else 0}")
+    lines.extend(
+        [
+            "# HELP sealquery_protocol_fee_bps Protocol fee in basis points.",
+            "# TYPE sealquery_protocol_fee_bps gauge",
+            f"sealquery_protocol_fee_bps {snap['protocol_fee_bps']}",
+        ]
+    )
+
+    lines.append("# HELP sealquery_dataset_budget_used Daily queries used.")
+    lines.append("# TYPE sealquery_dataset_budget_used gauge")
+    for entry in snap["datasets"]:
+        if "error" in entry:
+            continue
+        dataset_id = _label(entry["dataset_id"])
+        lines.append(
+            f'sealquery_dataset_budget_used{{dataset_id="{dataset_id}"}} {entry["budget"].get("count", 0)}'
+        )
+    lines.append("# HELP sealquery_dataset_budget_limit Daily query budget.")
+    lines.append("# TYPE sealquery_dataset_budget_limit gauge")
+    for entry in snap["datasets"]:
+        if "error" in entry:
+            continue
+        dataset_id = _label(entry["dataset_id"])
+        lines.append(
+            f'sealquery_dataset_budget_limit{{dataset_id="{dataset_id}"}} {entry["dataset"].get("budget_per_day", 0)}'
+        )
+
+    lines.append("# HELP sealquery_queries_total Query records by status.")
+    lines.append("# TYPE sealquery_queries_total gauge")
+    for status, count in db.query(QueryRecord.status, func.count()).group_by(QueryRecord.status).all():
+        lines.append(f'sealquery_queries_total{{status="{_label(status)}"}} {count}')
+
+    lines.append("# HELP sealquery_jobs_total Jobs by status.")
+    lines.append("# TYPE sealquery_jobs_total gauge")
+    for status, count in db.query(JobRecord.status, func.count()).group_by(JobRecord.status).all():
+        lines.append(f'sealquery_jobs_total{{status="{_label(status)}"}} {count}')
+
+    lines.append("# HELP sealquery_events_total Indexed events by type.")
+    lines.append("# TYPE sealquery_events_total gauge")
+    for event, count in db.query(EventRecord.event, func.count()).group_by(EventRecord.event).all():
+        lines.append(f'sealquery_events_total{{event="{_label(event)}"}} {count}')
+
+    checkpoint = db.get(IndexerCheckpoint, "events")
+    lines.append("# HELP sealquery_event_indexer_last_block Last indexed block height.")
+    lines.append("# TYPE sealquery_event_indexer_last_block gauge")
+    lines.append(f"sealquery_event_indexer_last_block {checkpoint.last_block if checkpoint else 0}")
+
+    lines.append("# HELP sealquery_service_stale_seconds Seconds since a service heartbeat.")
+    lines.append("# TYPE sealquery_service_stale_seconds gauge")
+    for name, info in service_status(db).items():
+        lines.append(f'sealquery_service_stale_seconds{{service="{_label(name)}"}} {info["stale_seconds"]}')
+
+    return "\n".join(lines) + "\n"

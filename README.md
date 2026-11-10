@@ -344,6 +344,7 @@ API endpoints:
 - `GET /api/attestation/<tx_hash>/bundle` — downloadable proof bundle
 - `GET /api/health` — liveness
 - `GET /api/ready` — database readiness
+- `GET /metrics` — Prometheus gauges for queries, jobs, events, budgets, and service heartbeats
 
 Set `SEALQUERY_API_KEY` before starting the server to require an API key on the
 machine endpoint. The browser endpoint stays same-origin and key-free.

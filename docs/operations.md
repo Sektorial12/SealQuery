@@ -27,7 +27,10 @@ python3 scripts/monitor.py --interval 30
 python3 scripts/monitor.py --url http://127.0.0.1:8080/api/metrics --once
 ```
 
-The monitor polls `GET /api/metrics`. Alerts:
+The monitor polls `GET /api/metrics`. Prometheus can scrape `GET /metrics`.
+Worker/indexer heartbeats are exposed as `sealquery_service_stale_seconds` and
+surface as `worker_missing`/`worker_stale` or `indexer_missing`/`indexer_stale`
+alerts. Alerts:
 
 | Code | Severity | Meaning |
 |---|---|---|

@@ -33,6 +33,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_events_block_height ON events (block_height)",
     "CREATE INDEX IF NOT EXISTS ix_events_event ON events (event)",
     "CREATE INDEX IF NOT EXISTS ix_datasets_owner ON datasets (owner)",
+    "CREATE INDEX IF NOT EXISTS ix_service_heartbeats_last_seen ON service_heartbeats (last_seen)",
 ]
 
 

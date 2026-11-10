@@ -4,7 +4,7 @@ import time
 
 from .config import get_settings
 from .db import SessionLocal, init_db
-from .services import sync_datasets, sync_events, sync_queries
+from .services import heartbeat, sync_datasets, sync_events, sync_queries
 
 
 def main() -> None:
@@ -26,6 +26,7 @@ def main() -> None:
                 f"indexed datasets={datasets} queries={queries} event_blocks={events}",
                 flush=True,
             )
+            heartbeat(db, "indexer", f"event_blocks={events}")
         except Exception as error:
             db.rollback()
             print(f"indexer error: {error}", flush=True)

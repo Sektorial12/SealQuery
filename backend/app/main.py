@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from . import services
@@ -121,6 +121,14 @@ def query_detail(query_id: int, db: Session = Depends(get_db)) -> dict:
 def usage(db: Session = Depends(get_db)) -> dict:
     items = services.list_queries(db, 100)
     return {"agent": settings.agent_account, "count": len(items), "queries": items}
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus(db: Session = Depends(get_db)) -> Response:
+    return Response(
+        services.prometheus_metrics(db),
+        media_type="text/plain; version=0.0.4",
+    )
 
 
 @app.get("/api/events")

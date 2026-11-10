@@ -454,6 +454,18 @@ python3 scripts/verify_query.py \
   `2jG5kdP6tUZiso3u8eAEttgr1R2NaHdSPSgyveirSUDg`.
 - Owner balance unchanged for the rejected query.
 
+## Observability and backups
+
+- `GET /api/ready` checks database readiness; Render and Compose health checks
+  use it.
+- `GET /metrics` exposes Prometheus gauges for paused state, budgets, query/job
+  counts, event counts, event-indexer checkpoint, and service heartbeat age.
+- Worker and indexer write heartbeats; `/api/metrics` raises
+  `worker_missing`/`worker_stale` and `indexer_missing`/`indexer_stale` alerts.
+- `scripts/backup_postgres.sh` was tested against local Postgres 16 and produced
+  `backups/sealquery-20261110T154613Z.dump`; restore is guarded by
+  `RESTORE_CONFIRM=1`.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.

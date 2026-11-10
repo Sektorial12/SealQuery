@@ -5,7 +5,7 @@ import time
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .models import JobRecord
-from .services import claim_job, reconcile_jobs, run_job
+from .services import claim_job, heartbeat, reconcile_jobs, run_job
 
 
 def main() -> None:
@@ -31,6 +31,11 @@ def main() -> None:
                         flush=True,
                     )
                     worked = True
+            heartbeat(
+                db,
+                "worker",
+                f"queued={db.query(JobRecord).filter(JobRecord.status == 'queued').count()}",
+            )
         except Exception as error:
             db.rollback()
             print(f"worker error: {error}", flush=True)

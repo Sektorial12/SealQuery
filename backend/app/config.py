@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     event_indexer_interval_seconds: float = Field(
         default=5.0, validation_alias=AliasChoices("EVENT_INDEXER_INTERVAL_SECONDS", "SEALQUERY_EVENT_INDEXER_INTERVAL_SECONDS")
     )
+    heartbeat_timeout_seconds: int = Field(
+        default=120, validation_alias=AliasChoices("HEARTBEAT_TIMEOUT_SECONDS", "SEALQUERY_HEARTBEAT_TIMEOUT_SECONDS")
+    )
     worker_poll_seconds: float = Field(
         default=2.0,
         validation_alias=AliasChoices("WORKER_POLL_SECONDS", "SEALQUERY_WORKER_POLL_SECONDS"),

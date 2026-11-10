@@ -91,3 +91,11 @@ class IndexerCheckpoint(Base):
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
     last_block: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ServiceHeartbeat(Base):
+    __tablename__ = "service_heartbeats"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
