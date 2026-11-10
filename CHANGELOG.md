@@ -10,6 +10,7 @@
 - Added RPC snapshot fallback, stricter proxy handling, UI attestation retries, and honest proof badges.
 - Updated the async incident drill and p95 calculation.
 - Paused queries now fail before transaction submission.
+- Pinned backend dependencies and the external verifier revision.
 
 ## 0.3.4 — 2026-11-10
 
