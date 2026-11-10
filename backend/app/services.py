@@ -557,6 +557,8 @@ def run_job(db: Session, job: JobRecord) -> None:
     try:
         if (job.dataset_id, job.computation_id) not in settings.datasets:
             raise ValueError("dataset/computation is not in the configured demo allowlist")
+        if agent_client.rpc_view(settings.contract_account, "get_paused", {}):
+            raise RuntimeError("contract is paused")
         dataset = agent_client.rpc_view(
             settings.contract_account, "get_dataset", {"dataset_id": job.dataset_id}
         )
