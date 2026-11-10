@@ -17,6 +17,21 @@ current demo.
 Only the worker holds the demo agent's keychain access. The API queues jobs and
 serves read-only views; the browser never receives a key.
 
+## Demo budget and registry admin
+
+The contract owner can reset a testnet agent budget or remove a dataset with no
+open queries:
+
+```bash
+near contract call-function as-transaction "$CONTRACT_ACCOUNT" reset_budget \
+  json-args '{"agent":"agent2.sealquery-1794187176.testnet","dataset_id":"retail_v1"}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' \
+  sign-as "$OWNER_ACCOUNT" network-config testnet sign-with-keychain send
+```
+
+Dataset registration is contract-owner gated. This is intentionally stricter
+than a permissionless marketplace until owner-proof binding is implemented.
+
 ## Monitoring
 
 ```bash

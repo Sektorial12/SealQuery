@@ -481,7 +481,9 @@ Highlights:
 - Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
 - Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query, registrations are contract-owner gated, protocol fees freeze after the first query, and late callbacks cannot overwrite final queries.
 - Hosted async query `32` after the first contract upgrade: task `41071`, `PROVEN`, settled.
-- The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset.
+- The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset, and its budget was reset for judging.
+- Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
+- Live ready-result regression: query `37` was left ready; `refund_query` was rejected with `ready query must be settled, not refunded`, then `settle_query` paid the owner after timeout.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
 ## Known limitations

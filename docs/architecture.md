@@ -59,5 +59,5 @@ Indexer ──> NEAR RPC contract views + Neardata NEP-297 events ──> Postgr
 - TEE proves execution, not semantic correctness.
 - No differential privacy; budget/cohort/rounding are the current controls.
 - Public Neardata rate limits make full historical event backfill optional.
-- The public browser query endpoint spends the demo agent balance; gate it
-  before publicizing.
+- The browser query endpoint is dataset-allowlisted, key-free, rate-limited, and
+  disabled in the UI when the daily demo budget is exhausted.

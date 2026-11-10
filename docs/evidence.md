@@ -212,8 +212,21 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   owner settlement after timeout, accept replay, protocol-fee freezing,
   owner-gated registration, budget reset, dataset removal, and late/failed callbacks.
 - Hosted query `32` after the v0.2.1 upgrade: task `41071`, `PROVEN`, settled.
-- Post-upgrade async incident drill: job `3a78aa87a4eb4535a454af5c9bf55bb3` failed
-  fast with `contract is paused`; pause/unpause finished with `DRILL PASSED`.
+- Post-v0.2.2 query `36`: task `45967`, `PROVEN`, settled; request
+  `G7UEUxyenoruZzQiheLeCM7ND58Kd2dU6vRKdTdpo2YA`, accept
+  `EVUoAdUKMhxfDiuVUU9JeFHd8SAmo6R56qgyx4hGLVGK`.
+- Ready-result regression on the live v0.2.2 contract: query `37` request
+  `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`; after the callback set it
+  `ready`, `refund_query` was rejected with
+  `Smart contract panicked: ready query must be settled, not refunded`.
+- After the 200-block timeout, permissionless `settle_query` paid the owner:
+  transaction `2nVhVTfXKcUuhbxsZa1HaMcEyAm8viBcjzXuDYWmc4Wo`; query `37` is
+  `settled`.
+- Live v0.2.2 state after cleanup: `list_datasets` = `["retail_v1"]`, budget
+  `2/20`, `paused=false`.
+- Post-upgrade async incident drill on v0.5.0 API: job
+  `a8929f45227d461ca71d469b3d712deb` failed fast with `contract is paused`;
+  pause/unpause finished with `DRILL PASSED`.
 
 ## End-to-end query
 
