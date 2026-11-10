@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -799,6 +800,11 @@ def reconcile_jobs(db: Session) -> int:
             _job_fail(db, job, f"reconciliation failed: {error}")
             count += 1
     return count
+
+
+def readiness(db: Session) -> dict:
+    db.execute(text("SELECT 1"))
+    return {"ok": True, "database": "ok"}
 
 
 def list_events(db: Session, limit: int = 50) -> list[dict]:

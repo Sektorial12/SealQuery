@@ -342,7 +342,8 @@ API endpoints:
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
 - `GET /api/attestation/<tx_hash>` — structured TDX attestation report
 - `GET /api/attestation/<tx_hash>/bundle` — downloadable proof bundle
-- `GET /api/health`
+- `GET /api/health` — liveness
+- `GET /api/ready` — database readiness
 
 Set `SEALQUERY_API_KEY` before starting the server to require an API key on the
 machine endpoint. The browser endpoint stays same-origin and key-free.
@@ -413,8 +414,8 @@ API_URL=http://127.0.0.1:8000 \
 ```
 
 See `docs/architecture.md` for the system diagram and trust boundaries.
-See `docs/operations.md` for monitoring thresholds, SLOs, runbooks, key
-rotation, and the incident drill. See `docs/threat-model.md` for the threat
+See `docs/operations.md` for monitoring thresholds, SLOs, runbooks, backups,
+key rotation, and the incident drill. See `docs/threat-model.md` for the threat
 model and privacy review.
 
 Run the end-to-end demo flow:

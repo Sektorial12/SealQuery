@@ -32,3 +32,10 @@ def test_async_query_enqueues_job() -> None:
         job = client.get(f"/api/jobs/{payload['job_id']}")
         assert job.status_code == 200
         assert job.json()["status"] == "queued"
+
+
+def test_ready() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/ready")
+    assert response.status_code == 200
+    assert response.json()["database"] == "ok"

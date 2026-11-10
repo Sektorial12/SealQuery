@@ -64,6 +64,14 @@ def _identity(request: Request, x_api_key: str | None = None) -> str:
     return f"ip:{ip}"
 
 
+@app.get("/api/ready")
+def ready(db: Session = Depends(get_db)) -> dict:
+    try:
+        return services.readiness(db)
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {

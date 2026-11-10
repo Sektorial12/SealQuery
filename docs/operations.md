@@ -142,6 +142,28 @@ remains authoritative. In-memory idempotency and rate-limit state is lost on
 restart; clients should retry with a new idempotency key only after checking the
 query history.
 
+## Backups and restore
+
+Use a Neon **direct** connection for backups. The script strips `+psycopg` and
+`-pooler` from `DATABASE_URL` automatically.
+
+```bash
+export DATABASE_URL='postgresql+psycopg://...-pooler.../neondb?sslmode=require'
+./scripts/backup_postgres.sh
+```
+
+Backups land in `backups/` (ignored). Restore is guarded:
+
+```bash
+export DATABASE_URL='postgresql+psycopg://.../neondb?sslmode=require'
+export BACKUP_FILE='backups/sealquery-....dump'
+RESTORE_CONFIRM=1 ./scripts/restore_postgres.sh
+```
+
+Render disks holding proof bundles are not backed up automatically; copy them to
+object storage before relying on them. Neon point-in-time recovery is the
+database backup of record.
+
 ## Secret management
 
 - Local development uses `.env` (ignored) and the NEAR keychain.

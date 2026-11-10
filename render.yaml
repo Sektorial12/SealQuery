@@ -14,7 +14,7 @@ services:
     plan: starter
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
     disk:
       name: sealquery-data
       mountPath: /app/data

@@ -47,3 +47,6 @@ data/
 # NEAR access key files (never commit)
 *access-key*.json
 near-access-key*.json
+
+# Local database backups
+backups/
