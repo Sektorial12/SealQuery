@@ -78,8 +78,14 @@ services:
     runtime: node
     plan: starter
     rootDir: frontend
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm build &&
+      mkdir -p .next/standalone/.next/static &&
+      cp -R .next/static/. .next/standalone/.next/static/
     startCommand: node .next/standalone/server.js
+    healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: "22"
