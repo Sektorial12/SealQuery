@@ -441,6 +441,19 @@ python3 scripts/verify_query.py \
 - `GET /api/owner/summary` returns indexed owner earnings; the local test DB
   reported 2 owners, 16 settled queries, and `0.17 NEAR` gross owner reward.
 
+## Demo flow script
+
+- `scripts/demo_flow.py` runs the hosted/local async flow and prints a transcript.
+- Accepted demo query `29` — OutLayer task `39338`, `PROVEN`, TCB `UpToDate`,
+  request tx `4ze6cpKMDdSmYCsti6EYoA5fe4mCXCGXBs9gYLuSEYXK`, accept tx
+  `F9woKqZh3B4TMXBiidPahcmXJqmt8uFwqp6KaTKNEinL`.
+- Proof bundle: `data/demo_proof.json` (33,665 bytes); offline verification:
+  `PROVEN task 39338 (execute) 8fb3786dc6c3c5ef…ac4991b3`.
+- Rejected demo query `30` — `refunded`; request tx
+  `GUZzDPS5jgHKfYjG6zqRHTkoAxPaykZuVYgq2qce7BQ8`, refund tx
+  `2jG5kdP6tUZiso3u8eAEttgr1R2NaHdSPSgyveirSUDg`.
+- Owner balance unchanged for the rejected query.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.

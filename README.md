@@ -416,6 +416,14 @@ See `docs/operations.md` for monitoring thresholds, SLOs, runbooks, key
 rotation, and the incident drill. See `docs/threat-model.md` for the threat
 model and privacy review.
 
+Run the end-to-end demo flow:
+
+```bash
+python3 scripts/demo_flow.py \
+  --api-url https://sealquery-api.onrender.com \
+  --api-key "$SEALQUERY_API_KEY"
+```
+
 ## Multi-tenant controls
 
 ```bash
