@@ -409,6 +409,11 @@ python3 scripts/verify_query.py \
   - Query `20` with a disallowed country — `refunded`; refund tx
     `8gQbu15HZF6tNef14bypLqHBK4L9vDbTUcz69pQhwkrq`.
   - Query `22` via Docker Compose — `settled`.
+  - Hosted async query `25` — task `31808`, `PROVEN`, settled; request tx
+    `Z2fkhnhef4E3q18Deyt1yVMc8cpgsrH4yEzogK5xGTx`, accept tx
+    `C1FcBieUfyZX7iBftfPDzqMsGsVGAbqou2W6pvDj9WA4`.
+  - The Render worker consumed the hosted job (`attempts: 1`) and the hosted
+    UI query page rendered the TDX report.
 - Reconciler test: a stale running job without a query ID was moved to `error`
   with `job timed out before a query was submitted`.
 - MCP `run_query` now polls the async job endpoint; MCP query `21` settled with
