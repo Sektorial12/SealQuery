@@ -4,6 +4,7 @@
 
 - Pinned backend dependencies and the external verifier revision.
 - Clarified the reproducible build commit for the deployed contract.
+- Exposed the API version on `/api/health`.
 
 ## 0.4.0 — 2026-11-10
 

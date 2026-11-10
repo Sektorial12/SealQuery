@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.2.0",
+    version="0.4.1",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )
@@ -76,6 +76,7 @@ def ready(db: Session = Depends(get_db)) -> dict:
 def health() -> dict:
     return {
         "ok": True,
+        "version": app.version,
         "contract": settings.contract_account,
         "agent": settings.agent_account,
         "machine_auth": bool(settings.api_key),
