@@ -42,8 +42,6 @@ services:
         value: "5"
       - key: PROOF_DIR
         value: data/proofs
-      - key: LEGACY_TX_FILE
-        value: data/query_tx.json
 
   - type: worker
     name: sealquery-indexer
@@ -83,8 +81,6 @@ services:
         value: "15"
       - key: PROOF_DIR
         value: data/proofs
-      - key: LEGACY_TX_FILE
-        value: data/query_tx.json
 
   - type: worker
     name: sealquery-worker
@@ -128,8 +124,6 @@ services:
         value: "2"
       - key: PROOF_DIR
         value: data/proofs
-      - key: LEGACY_TX_FILE
-        value: data/query_tx.json
 
   - type: web
     name: sealquery-web

@@ -345,7 +345,7 @@ python3 scripts/verify_query.py \
 ## Production web app validation
 
 - `frontend/` is a Next.js 16 + TypeScript + Tailwind app that proxies `/api/*`
-  to the Flask API.
+  to FastAPI.
 - `pnpm lint` and `pnpm build` pass.
 - Routes verified in headless Chromium: `/`, `/pricing`, `/security`, `/status`,
   `/docs`, `/app`, `/app/datasets`, `/app/datasets/retail_v1`, `/app/queries`,
@@ -360,8 +360,6 @@ python3 scripts/verify_query.py \
   - Request transaction: `AWXN48inL2QCPRs3XMZ1snfBt2d8yqoPbFyDaSuuL3k1`
   - Refund transaction: `H8bjSYq5jxwaxRSPUD7A8P9RUaphb47zegAb5ywV6hzi`
   - Status: `refunded`; no aggregate released
-- The app still uses the Flask API. FastAPI, Postgres indexing, Docker Compose,
-  and the hosted deployment are not yet done.
 
 ## FastAPI and Postgres validation
 
@@ -474,9 +472,9 @@ python3 scripts/verify_query.py \
 - Execution is limited to 180 seconds.
 - The demo supports two datasets across two owners, one approved computation per dataset, and one configured agent key.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
-- The demo API keeps idempotency and rate-limit state in memory in a single process.
+- The demo API is a single FastAPI process; Redis backs idempotency/rate limits when deployed, with an in-memory local fallback.
 - No central secret manager, on-call routing, or production dashboards are implemented.
 - Paid concurrent-query load and a full OutLayer outage simulation are not run.
-- Query transaction links for API-executed queries are persisted locally in `data/query_tx.json`.
+- Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
 - The UI uses the server-side demo agent; a human wallet connection is deferred.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.

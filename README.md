@@ -21,6 +21,7 @@ A working NEAR testnet proof with no mocked execution, attestation, access contr
 - A per-dataset privacy budget (20 by default), minimum cohort of 100, output rounding, and a canary row that never appears in results.
 - Multi-tenant controls: multiple owners, dataset versions and rotation, pause, per-dataset pricing/budgets, protocol fees, and query history.
 - Negative-path tests for unauthorized computations, unauthorized acceptance, direct OutLayer calls, replay, failed executions, refunds, tampered attestations, budget exhaustion, and paused contracts.
+- A Next.js product app, FastAPI/Postgres/Redis API, async query worker, refund reconciler, event indexer, owner earnings, readiness/metrics, and Docker Compose + Render deployment.
 - Reproducible contract build, CI, deploy scripts, and clean-clone verification with a real query.
 
 ## How NEAR is used
@@ -41,10 +42,8 @@ OutLayer provides Intel TDX execution and per-execution attestations. NEAR provi
 contracts/sealquery/   NEAR contract
 workload/              probe and approved WASI computation
 agent/                 agent client
-api/                   legacy Flask API and demo endpoint
-backend/               FastAPI service, indexer, Postgres models
+backend/               FastAPI service, worker, indexer, Postgres models
 frontend/              Next.js product web app
-web/                   legacy Flask-served demo console
 mcp/                   MCP stdio server
 compose.yaml           Next.js + FastAPI + Postgres + Redis + Caddy
 render.yaml            Render hosted mirror (Neon + Upstash)
@@ -56,6 +55,7 @@ docs/                  architecture, evidence, operations, threat model
 ## Requirements
 
 - Python 3.11+
+- Docker Engine 24+ and Docker Compose v2 (for `compose.yaml`)
 - Node.js 20+ and pnpm 10+ for `frontend/`
 - `curl` and `jq` for the operational scripts
 - Rust 1.99.1 (pinned in `rust-toolchain.toml`)
@@ -64,7 +64,7 @@ docs/                  architecture, evidence, operations, threat model
 - `wasmtime` 50.0.1
 - `outlayer` CLI 0.2.2
 - `outlayer-verify` 0.1.0
-- Python packages: `api/requirements.txt` (Flask) and `backend/requirements.txt` (FastAPI)
+- Python packages: `backend/requirements.txt`
 - NEAR testnet accounts: deployer, contract, data owner, agent
 - OutLayer testnet login and a project-restricted payment key
 - On hosts without the NEAR keychain, set `NEAR_ACCESS_KEY_FILE` to a mounted JSON access-key file
@@ -275,7 +275,7 @@ Expected: the contract query record, the result, and `PROVEN`.
 ## Web app
 
 The production-facing app lives in `frontend/` (Next.js + TypeScript). It uses the
-FastAPI service by default; the legacy Flask API remains available at :8080.
+FastAPI service.
 
 ```bash
 # terminal 1: FastAPI on :8000
@@ -294,59 +294,40 @@ and query detail pages, proof explorer, owner/agent surfaces, pricing, status,
 security, and docs. The browser never holds a key; queries are executed by the
 server-side demo agent.
 
-The legacy demo console remains at `http://127.0.0.1:8080` (served from `web/`)
-as a fallback while the Next.js app reaches parity.
+## API
 
-## Demo console and API
-
-The legacy Flask console is at :8080 and the FastAPI service is at :8000. Both
-expose the same core query/proof endpoints; the FastAPI service is the
-production API and the Flask console is a fallback UI.
+The FastAPI service is in `backend/`:
 
 ```bash
-export CONTRACT_ACCOUNT='<v2 contract>'
-export AGENT_ACCOUNT='<agent account>'
-export NEAR_NETWORK=testnet
-export OUTLAYER_API=https://testnet-api.outlayer.ai
-./scripts/run_demo.sh
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -r backend/requirements.txt
+./scripts/run_backend.sh
 ```
 
-Open `http://127.0.0.1:8080`.
-
-The UI shows the available datasets, owners, prices, quota usage, and a
-**Run query** button. The server submits the real testnet transaction, waits for
-the TEE result, verifies the attestation with `outlayer-verify`, accepts the
-result, and returns the owner payout delta. It also renders the structured TDX
-report (task ID, TCB status, MRTD, and per-check verdicts) and offers a
-downloadable proof bundle. No keys are exposed to the browser.
-
-A **Test rejected query** button sends a disallowed-country request, shows the
-privacy guard rejecting it, and confirms the agent refund.
+It defaults to SQLite for local development. Docker Compose and Render use
+Postgres, Redis, a worker, and an indexer. The browser app and API are
+same-origin through the Next.js proxy or Caddy; the browser never holds a key.
 
 API endpoints:
 
 - `GET /api/state` — contract state, datasets, budgets, recent queries
-- `GET /api/metrics` — balances, query status, budgets, and alerts
-- `GET /api/usage` — query history for the configured agent
-- `GET /api/queries` — indexed query history
-- `GET /api/queries/<id>` — one indexed query record
-- `GET /api/events` — recent NEP-297 contract events
-- `GET /api/owner/summary` — indexed owner earnings and dataset history
+- `GET /api/metrics` — balances, query status, budgets, alerts, service heartbeats
+- `GET /api/queries` / `GET /api/queries/<id>` — indexed query history
+- `GET /api/events` — indexed NEP-297 contract events
+- `GET /api/owner/summary` — indexed owner earnings
 - `POST /api/query` — enqueue a browser query; returns `202` + `job_id`
-- `GET /api/jobs/<job_id>` — poll an async job
+- `GET /api/jobs/<job_id>` — poll a browser job
 - `POST /api/v1/query` — enqueue a machine query; requires `X-API-Key` when configured
 - `GET /api/v1/jobs/<job_id>` — poll a machine job
-- `POST /api/query/sync` — legacy synchronous browser query
-- `POST /api/v1/query/sync` — legacy synchronous machine query
-- `GET /api/v1/query/<id>` — machine query record
+- `POST /api/query/sync` / `POST /api/v1/query/sync` — legacy synchronous routes
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
 - `GET /api/attestation/<tx_hash>` — structured TDX attestation report
 - `GET /api/attestation/<tx_hash>/bundle` — downloadable proof bundle
 - `GET /api/health` — liveness
 - `GET /api/ready` — database readiness
-- `GET /metrics` — Prometheus gauges for queries, jobs, events, budgets, and service heartbeats
+- `GET /metrics` — Prometheus gauges
 
-Set `SEALQUERY_API_KEY` before starting the server to require an API key on the
+Set `SEALQUERY_API_KEY` before starting the service to require an API key on the
 machine endpoint. The browser endpoint stays same-origin and key-free.
 
 ```bash
@@ -492,6 +473,8 @@ Highlights:
 - Monitoring: `/api/metrics` reported no critical alerts; `monitor.py --once` exited `0`.
 - Load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm.
 - Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
+- Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
+- Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
 ## Known limitations
 
@@ -499,12 +482,11 @@ Highlights:
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
 - Execution is limited to 180 seconds.
-- One dataset, one computation, one agent, and one contract are supported.
+- Two datasets across two owners and one computation per dataset are supported.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
-- Large results over the NEAR callback limit still need an off-chain delivery path.
-- The demo API is single-process; idempotency and rate-limit state are in memory.
-- Query transaction links for API-executed queries are persisted in `data/query_tx.json`; a production deployment would use a contract-event indexer.
+- The demo API is a single FastAPI process; Redis holds idempotency and rate-limit state when deployed, and in-memory fallback is used locally.
+- Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 

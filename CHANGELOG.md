@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 — 2026-11-10
+
+- Removed the legacy Flask API and static demo console.
+- Consolidated API, deployment, and architecture documentation on FastAPI + Next.js.
+- Removed local-only transaction-map fallback and stale placeholder files.
+- Added readiness, Prometheus metrics, worker/indexer heartbeats, and backup scripts.
+
 ## 0.3.1 — 2026-11-10
 
 - Added database readiness checks and PostgreSQL indexes.

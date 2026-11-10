@@ -11,7 +11,6 @@ current demo.
 - **FastAPI:** `http://127.0.0.1:8000`
 - **Next.js app:** `http://127.0.0.1:3000`
 - **Compose/Caddy:** `http://127.0.0.1:8080`
-- **Legacy Flask console:** `http://127.0.0.1:8080` (when not using Compose)
 - **OutLayer project:** `sealquery-1794187176.testnet/sealquery-approved`
 - **Proof bundles:** `data/proofs/*.json` (ignored local artifacts)
 
@@ -140,7 +139,7 @@ service restoration. It requires `DRILL_CONFIRM=1` to prevent accidental use.
 
 ### API restart or crash
 
-Restart with `./scripts/run_backend.sh` (FastAPI) or `./scripts/run_demo.sh` (legacy Flask) and the required environment. The contract
+Restart with `./scripts/run_backend.sh` and the required environment. The contract
 remains authoritative. In-memory idempotency and rate-limit state is lost on
 restart; clients should retry with a new idempotency key only after checking the
 query history.

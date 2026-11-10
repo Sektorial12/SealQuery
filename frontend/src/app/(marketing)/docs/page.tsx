@@ -87,7 +87,7 @@ cd frontend
 pnpm install
 API_URL=http://127.0.0.1:8000 pnpm dev`}
             </div>
-            <p className="mt-2 text-[10px] text-faint">The FastAPI service is served at :8000; the Next.js app is served at :3000 and proxies /api to it. The legacy Flask console remains at :8080.</p>
+            <p className="mt-2 text-[10px] text-faint">The FastAPI service is served at :8000; the Next.js app is served at :3000 and proxies /api to it.</p>
           </section>
 
           <section id="api" className="panel p-6">

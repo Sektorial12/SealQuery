@@ -26,14 +26,14 @@ export default function AgentPage() {
       "command": "python3",
       "args": ["mcp/server.py"],
       "env": {
-        "SEALQUERY_API_URL": "http://127.0.0.1:8080",
+        "SEALQUERY_API_URL": "http://127.0.0.1:8000",
         "SEALQUERY_API_KEY": "<your key>"
       }
     }
   }
 }`;
 
-  const curl = `curl -s http://127.0.0.1:8080/api/state | jq '{paused, datasets: [.datasets[] | {dataset_id, price: .quote.price_yocto}]}'`;
+  const curl = `curl -s http://127.0.0.1:8000/api/state | jq '{paused, datasets: [.datasets[] | {dataset_id, price: .quote.price_yocto}]}'`;
 
   return (
     <div className="space-y-5">

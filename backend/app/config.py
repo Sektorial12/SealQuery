@@ -66,7 +66,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JOB_TIMEOUT_SECONDS", "SEALQUERY_JOB_TIMEOUT_SECONDS"),
     )
     proof_dir: str = "data/proofs"
-    legacy_tx_file: str = "data/query_tx.json"
     demo_datasets: str = '[["retail_v1","spend_growth_v1"],["retail_alt","spend_growth_alt"]]'
 
     @property

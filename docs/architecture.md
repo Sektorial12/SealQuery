@@ -53,7 +53,6 @@ Indexer ──> NEAR RPC contract views + Neardata NEP-297 events ──> Postgr
 - `render.yaml`: managed public testnet mirror using Neon and Upstash.
 - `backend/`: FastAPI, worker, indexer, models.
 - `frontend/`: Next.js product app.
-- `api/` + `web/`: legacy Flask demo fallback.
 
 ## Known limits
 

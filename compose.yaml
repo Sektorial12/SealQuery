@@ -41,7 +41,6 @@ services:
       SEALQUERY_STATE_TTL_SECONDS: ${SEALQUERY_STATE_TTL_SECONDS:-5}
       NEAR_ACCESS_KEY_FILE: /run/secrets/near-access-key.json
       PROOF_DIR: data/proofs
-      LEGACY_TX_FILE: data/query_tx.json
     volumes:
       - ./data:/app/data
       - ${NEAR_ACCESS_KEY_FILE:?set NEAR_ACCESS_KEY_FILE}:/run/secrets/near-access-key.json:ro
@@ -74,7 +73,6 @@ services:
       JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-300}
       WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-2}
       PROOF_DIR: data/proofs
-      LEGACY_TX_FILE: data/query_tx.json
     volumes:
       - ./data:/app/data
       - ${NEAR_ACCESS_KEY_FILE:?set NEAR_ACCESS_KEY_FILE}:/run/secrets/near-access-key.json:ro
@@ -100,7 +98,6 @@ services:
       REDIS_URL: redis://redis:6379/0
       INDEXER_INTERVAL_SECONDS: ${INDEXER_INTERVAL_SECONDS:-15}
       PROOF_DIR: data/proofs
-      LEGACY_TX_FILE: data/query_tx.json
     volumes:
       - ./data:/app/data
     depends_on:

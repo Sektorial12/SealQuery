@@ -34,6 +34,4 @@ pnpm lint
 pnpm build
 ```
 
-The legacy Flask-served console remains at `http://127.0.0.1:8080` while the
-Next.js app reaches parity. The canonical deployment and FastAPI/Postgres
-migration are tracked in the root roadmap.
+The canonical deployment is `compose.yaml` at the repository root.

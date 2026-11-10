@@ -54,16 +54,6 @@ def _path(value: str) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
-def load_legacy_tx() -> dict[int, dict]:
-    path = _path(settings.legacy_tx_file)
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        return {int(key): value for key, value in raw.items()}
-    except Exception:
-        return {}
-
-
-
 def invalidate_snapshot() -> None:
     global _snapshot_cache
     with _cache_lock:
@@ -133,12 +123,6 @@ def _tx_map(db: Session, query_ids: list[int]) -> dict[int, dict]:
             "accept_tx": row.accept_tx,
             "refund_tx": row.refund_tx,
         }
-    legacy = load_legacy_tx()
-    for query_id in query_ids:
-        if query_id not in result and query_id in legacy:
-            result[query_id] = legacy[query_id]
-        elif query_id in result and not any(result[query_id].values()) and query_id in legacy:
-            result[query_id] = legacy[query_id]
     return result
 
 

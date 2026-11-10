@@ -12,7 +12,6 @@ dataset delivery to agents.
 - `agent/` — agent client
 - `backend/` — FastAPI API, async worker, indexer, Postgres models
 - `frontend/` — Next.js product app
-- `api/`, `web/` — legacy Flask API and demo console
 - `mcp/` — MCP stdio server
 - `scripts/` — dataset, deploy, verification, monitoring, demo tools
 - `docs/` — evidence, operations, threat model, architecture
