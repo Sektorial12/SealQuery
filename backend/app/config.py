@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     indexer_interval_seconds: int = 15
     indexer_on_startup: bool = False
+    worker_poll_seconds: float = Field(
+        default=2.0,
+        validation_alias=AliasChoices("WORKER_POLL_SECONDS", "SEALQUERY_WORKER_POLL_SECONDS"),
+    )
+    job_timeout_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices("JOB_TIMEOUT_SECONDS", "SEALQUERY_JOB_TIMEOUT_SECONDS"),
+    )
     proof_dir: str = "data/proofs"
     legacy_tx_file: str = "data/query_tx.json"
     demo_datasets: str = '[["retail_v1","spend_growth_v1"],["retail_alt","spend_growth_alt"]]'

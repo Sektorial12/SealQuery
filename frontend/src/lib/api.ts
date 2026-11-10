@@ -1,9 +1,9 @@
 import type {
   AttestationReport,
   Health,
+  JobResponse,
   Metrics,
   QueryRecord,
-  QueryRunResponse,
   State,
 } from "./types";
 
@@ -39,10 +39,11 @@ export const api = {
     computation_id: string;
     params?: Record<string, unknown>;
   }) =>
-    request<QueryRunResponse>("/api/query", {
+    request<JobResponse>("/api/query", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  job: (jobId: string) => request<JobResponse>(`/api/jobs/${jobId}`),
   attestation: (txHash: string) =>
     request<{ proven: boolean; attestation: AttestationReport; output?: string }>(
       `/api/attestation/${txHash}`,

@@ -57,6 +57,34 @@ services:
       retries: 12
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      CONTRACT_ACCOUNT: ${CONTRACT_ACCOUNT:?set CONTRACT_ACCOUNT}
+      AGENT_ACCOUNT: ${AGENT_ACCOUNT:?set AGENT_ACCOUNT}
+      NEAR_NETWORK: ${NEAR_NETWORK:-testnet}
+      NEAR_RPC: ${NEAR_RPC:-https://rpc.testnet.fastnear.com}
+      OUTLAYER_API: ${OUTLAYER_API:-https://testnet-api.outlayer.ai}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sealquery}:${POSTGRES_PASSWORD:-sealquery}@postgres:5432/${POSTGRES_DB:-sealquery}
+      REDIS_URL: redis://redis:6379/0
+      NEAR_ACCESS_KEY_FILE: /run/secrets/near-access-key.json
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-300}
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-2}
+      PROOF_DIR: data/proofs
+      LEGACY_TX_FILE: data/query_tx.json
+    volumes:
+      - ./data:/app/data
+      - ${NEAR_ACCESS_KEY_FILE:?set NEAR_ACCESS_KEY_FILE}:/run/secrets/near-access-key.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   indexer:
     build:
       context: .

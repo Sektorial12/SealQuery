@@ -395,6 +395,26 @@ python3 scripts/verify_query.py \
   - The backend container signed with the mounted access-key file and verified
     the proof with the built-in `outlayer-verify` binary.
 
+## Async query worker and refund reconciler
+
+- `POST /api/query` and `POST /api/v1/query` now enqueue a Postgres job and
+  return `202` with a `job_id`.
+- `GET /api/jobs/<job_id>` and `GET /api/v1/jobs/<job_id>` expose queue/running/
+  terminal state.
+- Worker processes jobs, updates query history, verifies TDX, and accepts or
+  refunds.
+- Async queries:
+  - Query `18` — settled.
+  - Query `19` via the Next.js UI — task `31785`, `PROVEN`, settled.
+  - Query `20` with a disallowed country — `refunded`; refund tx
+    `8gQbu15HZF6tNef14bypLqHBK4L9vDbTUcz69pQhwkrq`.
+  - Query `22` via Docker Compose — `settled`.
+- Reconciler test: a stale running job without a query ID was moved to `error`
+  with `job timed out before a query was submitted`.
+- MCP `run_query` now polls the async job endpoint; MCP query `21` settled with
+  `PROVEN`.
+- Compose now runs a separate `worker` service with the mounted access-key file.
+
 ## Known limitations
 
 - The dataset is public and used as a private-data stand-in.

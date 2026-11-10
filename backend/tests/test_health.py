@@ -17,3 +17,18 @@ def test_health() -> None:
     assert response.status_code == 200
     assert response.json()["ok"] is True
     assert response.json()["contract"] == "contract.testnet"
+
+
+def test_async_query_enqueues_job() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/query",
+            json={"dataset_id": "retail_v1", "computation_id": "spend_growth_v1"},
+        )
+        assert response.status_code == 202
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["status"] == "queued"
+        job = client.get(f"/api/jobs/{payload['job_id']}")
+        assert job.status_code == 200
+        assert job.json()["status"] == "queued"

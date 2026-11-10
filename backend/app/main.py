@@ -4,7 +4,7 @@ import hmac
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -115,8 +115,18 @@ def usage(db: Session = Depends(get_db)) -> dict:
     return {"agent": settings.agent_account, "count": len(items), "queries": items}
 
 
-@app.post("/api/query")
+@app.post("/api/query", status_code=status.HTTP_202_ACCEPTED)
 def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
+    if not rate_limiter.allow(_identity(request)):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+    try:
+        return services.enqueue_job(db, body)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.post("/api/query/sync")
+def run_query_sync(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
     if not rate_limiter.allow(_identity(request)):
         raise HTTPException(status_code=429, detail="rate limit exceeded")
     try:
@@ -125,7 +135,7 @@ def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> di
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 
-@app.post("/api/v1/query")
+@app.post("/api/v1/query", status_code=status.HTTP_202_ACCEPTED)
 def run_machine_query(
     request: Request,
     body: dict,
@@ -141,11 +151,48 @@ def run_machine_query(
         if cached is not None:
             return cached
     try:
-        result = services.execute_query(db, body)
+        result = services.enqueue_job(db, body)
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     if idempotency_key and result.get("ok"):
         idempotency.set(idempotency_key, result)
+    return result
+
+
+@app.post("/api/v1/query/sync")
+def run_machine_query_sync(
+    request: Request,
+    body: dict,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    require_machine_auth(x_api_key)
+    if not rate_limiter.allow(_identity(request, x_api_key)):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+    try:
+        return services.execute_query(db, body)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/jobs/{job_id}")
+def job(job_id: str, db: Session = Depends(get_db)) -> dict:
+    result = services.get_job(db, job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    return result
+
+
+@app.get("/api/v1/jobs/{job_id}")
+def machine_job(
+    job_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    require_machine_auth(x_api_key)
+    result = services.get_job(db, job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="job not found")
     return result
 
 

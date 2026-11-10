@@ -330,8 +330,12 @@ API endpoints:
 - `GET /api/usage` — query history for the configured agent
 - `GET /api/queries` — indexed query history
 - `GET /api/queries/<id>` — one indexed query record
-- `POST /api/query` — browser-facing demo query
-- `POST /api/v1/query` — machine query; requires `X-API-Key` when configured
+- `POST /api/query` — enqueue a browser query; returns `202` + `job_id`
+- `GET /api/jobs/<job_id>` — poll an async job
+- `POST /api/v1/query` — enqueue a machine query; requires `X-API-Key` when configured
+- `GET /api/v1/jobs/<job_id>` — poll a machine job
+- `POST /api/query/sync` — legacy synchronous browser query
+- `POST /api/v1/query/sync` — legacy synchronous machine query
 - `GET /api/v1/query/<id>` — machine query record
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
 - `GET /api/attestation/<tx_hash>` — structured TDX attestation report
@@ -345,16 +349,19 @@ machine endpoint. The browser endpoint stays same-origin and key-free.
 export SEALQUERY_API_KEY='local-demo-key'
 ./scripts/run_backend.sh
 
-curl -s http://127.0.0.1:8000/api/v1/query \
+job=$(curl -s http://127.0.0.1:8000/api/v1/query \
   -H "X-API-Key: $SEALQUERY_API_KEY" \
   -H 'Idempotency-Key: demo-query-1' \
   -H 'Content-Type: application/json' \
-  -d '{"dataset_id":"retail_v1"}' | jq '{ok,query_id,proof,accept_tx}'
+  -d '{"dataset_id":"retail_v1"}' | jq -r .job_id)
+
+curl -s "http://127.0.0.1:8000/api/v1/jobs/$job" \
+  -H "X-API-Key: $SEALQUERY_API_KEY" | jq '{status,proof,accept_tx,error}'
 ```
 
-Repeating the same `Idempotency-Key` returns the cached response with
-`X-Idempotent-Replay: true` instead of paying twice. The machine endpoint also
-enforces a per-key rate limit (`SEALQUERY_RATE_LIMIT_PER_MINUTE`, default 5).
+Repeating the same `Idempotency-Key` returns the same job instead of paying
+twice. The machine endpoint also enforces a per-key rate limit
+(`SEALQUERY_RATE_LIMIT_PER_MINUTE`, default 5).
 
 ## MCP
 

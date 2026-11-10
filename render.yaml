@@ -4,7 +4,8 @@
 # Required dashboard setup:
 # - Neon Postgres -> DATABASE_URL
 # - Upstash Redis -> REDIS_URL
-# - Render secret file near-access-key.json -> /etc/secrets/near-access-key.json
+# - Render secret file near-access-key.json on BOTH sealquery-api and
+#   sealquery-worker -> /etc/secrets/near-access-key.json
 # - Set API_URL on sealquery-web to https://<sealquery-api>.onrender.com
 services:
   - type: web
@@ -53,9 +54,15 @@ services:
     dockerCommand: python -m app.indexer
     envVars:
       - key: CONTRACT_ACCOUNT
-        sync: false
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: CONTRACT_ACCOUNT
       - key: AGENT_ACCOUNT
-        sync: false
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: AGENT_ACCOUNT
       - key: NEAR_NETWORK
         value: testnet
       - key: NEAR_RPC
@@ -63,11 +70,62 @@ services:
       - key: OUTLAYER_API
         value: https://testnet-api.outlayer.ai
       - key: DATABASE_URL
-        sync: false
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: DATABASE_URL
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: REDIS_URL
       - key: INDEXER_INTERVAL_SECONDS
         value: "15"
+      - key: PROOF_DIR
+        value: data/proofs
+      - key: LEGACY_TX_FILE
+        value: data/query_tx.json
+
+  - type: worker
+    name: sealquery-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    dockerCommand: python -m app.worker
+    envVars:
+      - key: CONTRACT_ACCOUNT
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: CONTRACT_ACCOUNT
+      - key: AGENT_ACCOUNT
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: AGENT_ACCOUNT
+      - key: NEAR_NETWORK
+        value: testnet
+      - key: NEAR_RPC
+        value: https://rpc.testnet.fastnear.com
+      - key: OUTLAYER_API
+        value: https://testnet-api.outlayer.ai
+      - key: NEAR_ACCESS_KEY_FILE
+        value: /etc/secrets/near-access-key.json
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          type: web
+          name: sealquery-api
+          envVarKey: REDIS_URL
+      - key: JOB_TIMEOUT_SECONDS
+        value: "300"
+      - key: WORKER_POLL_SECONDS
+        value: "2"
       - key: PROOF_DIR
         value: data/proofs
       - key: LEGACY_TX_FILE

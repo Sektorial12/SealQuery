@@ -2,12 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowUpRight, Check, CircleDashed, Play, ShieldAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AttestationCard } from "@/components/attestation-card";
 import { DatasetTile } from "@/components/dataset-card";
 import { api } from "@/lib/api";
 import { explorerTx, formatNear, parseResult, short } from "@/lib/format";
-import type { AggregateRow, DatasetState, QueryRunResponse } from "@/lib/types";
+import type { AggregateRow, DatasetState, JobResponse, QueryRunResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function QueryConsole() {
@@ -18,40 +18,59 @@ export function QueryConsole() {
     refetchInterval: 15_000,
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [result, setResult] = useState<QueryRunResponse | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const datasets = state?.datasets ?? [];
   const selected = datasets[selectedIndex] ?? datasets[0];
 
   const mutation = useMutation({
     mutationFn: api.runQuery,
-    onSuccess: (data) => {
-      setResult(data);
-      void queryClient.invalidateQueries({ queryKey: ["state"] });
-      void queryClient.invalidateQueries({ queryKey: ["metrics"] });
-      void queryClient.invalidateQueries({ queryKey: ["queries"] });
+    onSuccess: (data) => setJobId(data.job_id),
+  });
+
+  const { data: job, error: jobError } = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => api.job(jobId!),
+    enabled: Boolean(jobId),
+    retry: 1,
+    refetchInterval: (query) => {
+      const value = query.state.data;
+      return value && terminalStatuses.includes(value.status) ? false : 3000;
     },
   });
 
+  const terminal = job ? terminalStatuses.includes(job.status) : false;
+  const result = useMemo<QueryRunResponse | null>(
+    () => (job && terminal ? jobToResult(job) : null),
+    [job, terminal],
+  );
   const rows = useMemo<AggregateRow[]>(() => {
     const parsed = result ? parseResult(result.result) : null;
     return parsed?.results ?? [];
   }, [result]);
-
   const rejected = result?.status === "failed";
-  const running = mutation.isPending;
+  const inFlight = Boolean(jobId) && (!job || !terminal);
+  const running = mutation.isPending || inFlight;
   const paused = Boolean(state?.paused);
+
+  useEffect(() => {
+    if (!terminal) return;
+    void queryClient.invalidateQueries({ queryKey: ["state"] });
+    void queryClient.invalidateQueries({ queryKey: ["metrics"] });
+    void queryClient.invalidateQueries({ queryKey: ["queries"] });
+  }, [terminal, job?.job_id, queryClient]);
 
   function selectDataset(entry: DatasetState) {
     const index = datasets.findIndex((item) => item.dataset_id === entry.dataset_id);
     setSelectedIndex(index >= 0 ? index : 0);
-    setResult(null);
+    setJobId(null);
     mutation.reset();
   }
 
   function run(mode: "normal" | "rejected") {
     if (!selected?.dataset || running || paused) return;
-    setResult(null);
+    setJobId(null);
+    mutation.reset();
     mutation.mutate({
       dataset_id: selected.dataset_id,
       computation_id: selected.computation_id,
@@ -140,7 +159,7 @@ export function QueryConsole() {
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <button type="button" className="btn btn-primary flex-1" disabled={running || paused} onClick={() => run("normal")}>
-            <Play size={15} /> {running ? "Running attested query…" : "Run query"}
+            <Play size={15} /> {mutation.isPending ? "Queueing…" : running ? (job?.status === "queued" ? "Queued…" : "Running attested query…") : "Run query"}
           </button>
           <button
             type="button"
@@ -162,13 +181,25 @@ export function QueryConsole() {
           </div>
         ) : null}
 
-        {mutation.isError ? (
+        {mutation.isError || jobError ? (
           <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
-            {String(mutation.error)}
+            {String(mutation.error || jobError)}
           </div>
         ) : null}
 
-        <Timeline running={running} result={result} />
+        {job?.status === "error" ? (
+          <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+            {job.error || "The query worker reported an error."}
+          </div>
+        ) : null}
+
+        {jobId ? (
+          <p className="mt-3 font-mono text-[10px] text-faint">
+            job {short(jobId, 14, 8)} · {job?.status ?? "queued"}
+          </p>
+        ) : null}
+
+        <Timeline running={running} result={result} jobStatus={job?.status} />
 
         {result ? <Result result={result} rows={rows} rejected={rejected} /> : null}
       </div>
@@ -187,7 +218,37 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Timeline({ running, result }: { running: boolean; result: QueryRunResponse | null }) {
+const terminalStatuses = ["settled", "refunded", "failed", "error"];
+
+function jobToResult(job: JobResponse): QueryRunResponse {
+  return {
+    ok: true,
+    dataset_id: job.dataset_id,
+    computation_id: job.computation_id,
+    query_id: job.query_id ?? 0,
+    tx_hash: job.tx_hash ?? "",
+    status: job.status === "refunded" ? "failed" : (job.status as QueryRunResponse["status"]),
+    result: job.result,
+    proof: job.proof,
+    proof_output: job.proof_output,
+    accept_tx: job.accept_tx,
+    refund_tx: job.refund_tx,
+    owner: job.owner ?? "",
+    owner_before: job.owner_before,
+    owner_after: job.owner_after,
+    error: job.error ?? undefined,
+  };
+}
+
+function Timeline({
+  running,
+  result,
+  jobStatus,
+}: {
+  running: boolean;
+  result: QueryRunResponse | null;
+  jobStatus?: JobResponse["status"];
+}) {
   const steps = [
     { key: "request", label: "Request submitted" },
     { key: "compute", label: "TEE computation" },
@@ -197,12 +258,20 @@ function Timeline({ running, result }: { running: boolean; result: QueryRunRespo
   if (!running && !result) return null;
 
   const done = {
-    request: Boolean(running || result),
-    compute: Boolean(result && result.status !== "failed"),
-    verify: Boolean(result?.proof),
-    settle: Boolean(result?.accept_tx || result?.refund_tx),
+    request: Boolean((jobStatus && jobStatus !== "queued") || result),
+    compute: Boolean(
+      result && result.status !== "failed" ||
+        (jobStatus && ["ready", "settled", "refunded", "failed", "error"].includes(jobStatus)),
+    ),
+    verify: Boolean(result?.proof || jobStatus === "settled"),
+    settle: Boolean(
+      result?.accept_tx ||
+        result?.refund_tx ||
+        jobStatus === "settled" ||
+        jobStatus === "refunded",
+    ),
   } as Record<string, boolean>;
-  const failed = result?.status === "failed";
+  const failed = result?.status === "failed" || jobStatus === "error";
 
   return (
     <div className="mt-4 grid gap-2 rounded-xl border border-line bg-panel-2 p-3">

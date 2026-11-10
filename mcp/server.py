@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import uuid
 
 import requests
@@ -165,6 +166,11 @@ def tool_run_query(arguments: dict) -> dict:
         body["params"] = arguments["params"]
     idempotency_key = arguments.get("idempotency_key") or f"mcp-{uuid.uuid4()}"
     result = api_post("/api/v1/query", body, idempotency_key)
+    job_id = result.get("job_id")
+    terminal = {"settled", "refunded", "failed", "error"}
+    while job_id and result.get("status") not in terminal:
+        time.sleep(3)
+        result = api_get(f"/api/v1/jobs/{job_id}")
     result["idempotency_key"] = idempotency_key
     return result
 

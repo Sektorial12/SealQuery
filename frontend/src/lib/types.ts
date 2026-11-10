@@ -184,3 +184,35 @@ export type Health = {
   agent: string;
   machine_auth: boolean;
 };
+
+
+export type JobStatus =
+  | "queued"
+  | "running"
+  | "ready"
+  | "settled"
+  | "refunded"
+  | "failed"
+  | "error";
+
+export type JobResponse = {
+  ok: boolean;
+  job_id: string;
+  dataset_id: string;
+  computation_id: string;
+  status: JobStatus;
+  query_id: number | null;
+  tx_hash: string | null;
+  accept_tx: string | null;
+  refund_tx: string | null;
+  result: AggregateResult | string | null;
+  proof: boolean;
+  proof_output: string;
+  owner: string | null;
+  owner_before: string | null;
+  owner_after: string | null;
+  error: string | null;
+  attempts: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
