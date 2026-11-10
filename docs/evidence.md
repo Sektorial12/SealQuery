@@ -433,9 +433,10 @@ python3 scripts/verify_query.py \
   - `query_settled` at block `277018811`.
   - Query `25` ended `settled` with request tx `Z2fk...` and accept tx
     `C1FcB...`.
-- Neardata event indexing defaults to 5 blocks per cycle with retry/backoff for
-  429/5xx responses and an optional `NEARDATA_API_KEY`; the polling indexer
-  remains the historical fallback.
+- Neardata event indexing defaults to 10 blocks per 5 seconds (about
+  132 requests/minute including the latest-block lookup), with retry/backoff for
+  429/5xx and an optional `NEARDATA_API_KEY`; the polling indexer remains the
+  historical fallback.
 - `GET /api/events` exposes recent indexed events.
 - `GET /api/owner/summary` returns indexed owner earnings; the local test DB
   reported 2 owners, 16 settled queries, and `0.17 NEAR` gross owner reward.

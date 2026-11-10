@@ -10,11 +10,17 @@ from .services import sync_datasets, sync_events, sync_queries
 def main() -> None:
     settings = get_settings()
     init_db()
+    last_state_sync = 0.0
     while True:
         db = SessionLocal()
         try:
-            datasets = sync_datasets(db)
-            queries = sync_queries(db)
+            now = time.time()
+            datasets = 0
+            queries = 0
+            if now - last_state_sync >= settings.indexer_interval_seconds:
+                datasets = sync_datasets(db)
+                queries = sync_queries(db)
+                last_state_sync = now
             events = sync_events(db)
             print(
                 f"indexed datasets={datasets} queries={queries} event_blocks={events}",
@@ -23,11 +29,11 @@ def main() -> None:
         except Exception as error:
             db.rollback()
             print(f"indexer error: {error}", flush=True)
-            time.sleep(max(settings.indexer_interval_seconds, 60))
+            time.sleep(max(settings.event_indexer_interval_seconds, 60))
             continue
         finally:
             db.close()
-        time.sleep(settings.indexer_interval_seconds)
+        time.sleep(settings.event_indexer_interval_seconds)
 
 
 if __name__ == "__main__":

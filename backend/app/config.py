@@ -49,7 +49,10 @@ class Settings(BaseSettings):
         default=None, validation_alias=AliasChoices("EVENT_START_BLOCK", "SEALQUERY_EVENT_START_BLOCK")
     )
     event_blocks_per_sync: int = Field(
-        default=5, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
+        default=10, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
+    )
+    event_indexer_interval_seconds: float = Field(
+        default=5.0, validation_alias=AliasChoices("EVENT_INDEXER_INTERVAL_SECONDS", "SEALQUERY_EVENT_INDEXER_INTERVAL_SECONDS")
     )
     worker_poll_seconds: float = Field(
         default=2.0,
