@@ -1187,6 +1187,19 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "only the requesting agent can accept")]
+    fn rejects_accept_from_non_agent() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        let agent = account("agent.testnet");
+        ready_query(&mut contract, &agent);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(account("attacker.testnet"))
+            .build());
+        let _ = contract.accept_result(1);
+    }
+
+    #[test]
     #[should_panic(expected = "query result is not ready")]
     fn rejects_accept_replay() {
         let (mut contract, owner) = setup();

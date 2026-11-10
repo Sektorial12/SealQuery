@@ -16,11 +16,12 @@ A working NEAR testnet proof with no mocked execution, attestation, access contr
 
 - A real private dataset stored in OutLayer encrypted worker storage.
 - One approved computation running in Intel TDX on OutLayer testnet.
-- A multi-tenant NEAR contract (v2) that registers datasets/computations, escrows payment, calls OutLayer, receives the result, and settles to each dataset owner.
+- A dataset-registry NEAR contract (v2) that escrows payment, calls OutLayer, receives the result, and settles to the dataset owner. Registration is contract-owner gated; existing owners control their computations and economics.
 - An agent client that quotes, pays, waits, verifies the TEE attestation, and accepts the result.
 - A per-dataset privacy budget (20 by default), minimum cohort of 100, output rounding, and a canary row that never appears in results.
-- Multi-tenant controls: multiple owners, dataset versions and rotation, pause, per-dataset pricing/budgets, protocol fees, and query history.
-- Negative-path tests for unauthorized computations, unauthorized acceptance, direct OutLayer calls, replay, failed executions, refunds, tampered attestations, budget exhaustion, and paused contracts.
+- Dataset-scoped controls: versions and rotation, pause, per-dataset pricing/budgets, protocol fees, and query history.
+- Contract tests cover budget exhaustion, pause, unauthorized acceptance, replay, duplicate computations, economics, late callbacks, ready-result refund rejection, owner settlement after timeout, and failed/pending refunds.
+- Manual negative-path evidence covers unauthorized computations, direct OutLayer calls, and tampered attestations.
 - A Next.js product app, FastAPI/Postgres/Redis API, async query worker, refund reconciler, event indexer, owner earnings, readiness/metrics, and Docker Compose + Render deployment.
 - Reproducible contract build, CI, deploy scripts, and clean-clone verification with a real query.
 
@@ -95,17 +96,17 @@ Expected: `5 passed`.
 
 ### Reproducible build
 
-The deployed artifact was built from commit `6cf4ce3`. Check out that commit
+The deployed artifact was built from commit `90e382d`. Check out that commit
 first for a bit-identical hash; later commits change only the embedded source
 snapshot metadata.
 
 ```bash
-git checkout 6cf4ce3
+git checkout 90e382d
 cd contracts/sealquery
 cargo near build reproducible-wasm
 ```
 
-Expected v0.2.1 contract hash: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
+Expected v0.2.2 contract hash: `6749f0bab47ffa6bdc1aaeb9a54fc9eeb8b84f5c2e58f5a0fa4c4902fe5e146c`, built from commit `90e382d`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 
@@ -478,8 +479,9 @@ Highlights:
 - Load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm.
 - Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
 - Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
-- Hardened contract v0.2.1: late callbacks no longer overwrite refunded/settled queries, duplicate computation IDs are rejected, economics changes after queries are blocked, and owner escrow withdrawal is removed.
-- Hosted async query `32` after the contract upgrade: task `41071`, `PROVEN`, settled.
+- Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query, registrations are contract-owner gated, protocol fees freeze after the first query, and late callbacks cannot overwrite final queries.
+- Hosted async query `32` after the first contract upgrade: task `41071`, `PROVEN`, settled.
+- The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
 ## Known limitations
@@ -488,13 +490,15 @@ Highlights:
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
 - Execution is limited to 180 seconds.
-- Two datasets across two owners and one computation per dataset are supported.
+- One live demo dataset. The contract supports multiple datasets, but registration is contract-owner gated to prevent copying an existing hash/version under another owner.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
 - The demo API is a single FastAPI process; Redis holds idempotency and rate-limit state when deployed, and in-memory fallback is used locally.
 - Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
-- The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget.
+- The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget, and the UI disables the action when the daily budget is exhausted.
+- Paid aggregate results are public on-chain and through the API; raw rows are never delivered. The UI labels this explicitly.
 - Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
+- Dataset registration is contract-owner gated, so multi-tenant onboarding is not permissionless yet.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 

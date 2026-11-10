@@ -14,8 +14,8 @@ current demo.
 - **OutLayer project:** `sealquery-1794187176.testnet/sealquery-approved`
 - **Proof bundles:** `data/proofs/*.json` (ignored local artifacts)
 
-The API is the only process that holds the demo agent's keychain access. It
-runs the agent loop server-side; the browser never receives a key.
+Only the worker holds the demo agent's keychain access. The API queues jobs and
+serves read-only views; the browser never receives a key.
 
 ## Monitoring
 

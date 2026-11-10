@@ -1,10 +1,21 @@
 # Changelog
 
+## 0.5.0 — 2026-11-10
+
+- Blocked refunds of ready results; added permissionless owner settlement after timeout.
+- Contract-owner-gated dataset registration and removed the duplicate `retail_alt` copy.
+- Froze protocol fees after the first query.
+- Added owner-only demo budget reset and dataset removal.
+- Normalized stale budget days, disabled exhausted CTAs, and disclosed public aggregate results.
+- Sanitized transaction errors, refunded timed-out pending jobs, and removed the agent key from the public API process.
+- Added pandas/openpyxl to the documented Python requirements, robots.txt, and Caddy security headers.
+
 ## 0.4.1 — 2026-11-10
 
 - Pinned backend dependencies and the external verifier revision.
 - Clarified the reproducible build commit for the deployed contract.
 - Exposed the API version on `/api/health`.
+- Updated the API version to 0.5.0.
 
 ## 0.4.0 — 2026-11-10
 

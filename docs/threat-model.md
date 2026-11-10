@@ -8,7 +8,8 @@ is assumed, and what remains unsolved. It is not a production security audit.
 - Raw dataset rows and the protected dataset file.
 - The compute secret and the upload secret.
 - Agent funds and owner payouts.
-- Query parameters and aggregate results.
+- Query parameters and aggregate results. Aggregate results are public: they
+  are stored on-chain and served by the public API. Raw rows are never delivered.
 - Attestation evidence and proof bundles.
 - Contract state: datasets, computations, budgets, queries.
 
@@ -115,6 +116,8 @@ is assumed, and what remains unsolved. It is not a production security audit.
 - **Threat:** a data owner or operator swaps the dataset behind a registered
   hash.
 - **Present:** dataset hashes are registered and checked by the workload;
+  registration is contract-owner gated, so a different account cannot create a
+  new owner record for an existing dataset;
   rotation is owner-controlled and logged.
 - **Residual:** there is no historical version registry; the active version is
   the source of truth.

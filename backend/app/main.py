@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.4.1",
+    version="0.5.0",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )

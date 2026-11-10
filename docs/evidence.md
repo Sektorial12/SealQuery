@@ -53,7 +53,7 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Current upload transaction: `9XvfEPBmQXmkLmiiaG4fDUDeKat7SRabJz3qTaccdWxE`
 - Computation update transaction: `3wqMpjaMHnfU3gJYui6tg1njQuEimBaSQsKdHdgpqrX9`
 - The earlier proof used workload hash `0f20f00c…`; the current source builds to `3b1bc4ea…`.
-- Local unit tests: 15 contract tests and 5 workload tests passed
+- Local unit tests: 25 contract tests and 5 workload tests passed
 - Test command:
   ```bash
   cargo test -p sealquery-workload
@@ -91,11 +91,15 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - v2 deployer: `sealquery-v2-1794194344.testnet`
 - v2 contract: `contract.sealquery-v2-1794194344.testnet`
 - Contract version at the original deploy (historical): `0.2.0`
-- Live contract version: `0.2.1`
+- Live contract version: `0.2.2`
 - v2 code SHA-256 at the original deploy (historical): `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`
-- Hardened v0.2.1 code SHA-256: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`
-- Hardened deploy transaction: `GSPnhNo8izDYVPoVQytYYSSSEJrxRB9BagHZVZy3d5HN`
-- Hardened source commit: `6cf4ce3`
+- Hardened v0.2.1 code SHA-256 (historical): `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`
+- Hardened v0.2.1 deploy transaction (historical): `GSPnhNo8izDYVPoVQytYYSSSEJrxRB9BagHZVZy3d5HN`
+- Hardened v0.2.2 code SHA-256: `6749f0bab47ffa6bdc1aaeb9a54fc9eeb8b84f5c2e58f5a0fa4c4902fe5e146c`
+- Hardened v0.2.2 deploy transaction: `59FLXYrCv6m7d9zvaTPT2bQpXBYpVE1BjxUbLfs88RhR`
+- Hardened v0.2.2 source commit: `90e382d`
+- Removed duplicate `retail_alt` dataset: transaction `6kaJX4xU2JHzgobdUdkuiPbSGmg1HVMWYGpcCfScoLtA`
+- Reset demo budget for `agent2` on `retail_v1`: transaction `CZeXe9y4zQrtwmbUSiAECTKVZpkxDdDz5KXSHUaRgZBj`
 - Contract account funding transaction: `98B7gLLQRMfBbHMNtzMGz7Gp8wHABVpKscFETXRNvquh`
 - Initial deploy transaction: `dL3mcj92RyifeLzud5d4WdbxLYvYPQ9Z33kMssKTR4j`
 - Reproducible code deploy transaction: `DmA4RP8JvQFyTv9a4Yxu1R3D8f1MpEUw2Dv99EV5bbEX`
@@ -190,13 +194,23 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 ## Contract settlement hardening
 
 - `on_query_result` ignores callbacks unless the query is still `pending`.
-- `refund_query` remains terminal for settled/refunded queries.
+- `refund_query` rejects a `ready` query. The ready result stays visible, but the
+  agent cannot take the answer and refund the deposit.
+- `settle_query` lets anyone settle a ready query to the dataset owner after the
+  200-block timeout, so an abandoned result still pays the owner.
+- `refund_query` is terminal for settled/refunded queries and still refunds
+  failed queries and timed-out pending queries.
 - Duplicate `computation_id` values are rejected.
 - `reward + compute_deposit <= price` is enforced.
 - Dataset economics cannot change after the dataset has queries.
+- Protocol fees cannot change after the first query.
+- Dataset registration is contract-owner gated; the duplicate `retail_alt`
+  record was removed on-chain.
 - The owner-only `withdraw_contract_balance` method was removed.
-- Added contract tests for late callbacks after refund/settlement, duplicate
-  computations, economics overflow, and post-query economics changes.
+- `reset_budget` is owner-only and used only to restore the testnet demo budget.
+- Added contract tests for ready-query refund rejection, pending/failed refunds,
+  owner settlement after timeout, accept replay, protocol-fee freezing,
+  owner-gated registration, budget reset, dataset removal, and late/failed callbacks.
 - Hosted query `32` after the v0.2.1 upgrade: task `41071`, `PROVEN`, settled.
 - Post-upgrade async incident drill: job `3a78aa87a4eb4535a454af5c9bf55bb3` failed
   fast with `contract is paused`; pause/unpause finished with `DRILL PASSED`.
@@ -318,7 +332,8 @@ python3 scripts/verify_query.py \
 - Build image: `sourcescan/cargo-near:0.22.0-rust-1.99.1`
 - Image digest: `sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb`
 - Reproducible build command: `cd contracts/sealquery && cargo near build reproducible-wasm`
-- Reproducible contract hash: `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9`
+- Reproducible contract hash: `6749f0bab47ffa6bdc1aaeb9a54fc9eeb8b84f5c2e58f5a0fa4c4902fe5e146c` (v0.2.2)
+- Historical contract hash: `5e60a3d25970a34f265afd4ae83b7993462cf38be0f962c2d6bc5995709e94f9` (v0.1.0)
 - CI: `.github/workflows/ci.yml` runs format, clippy, tests, workload build, contract build, and secret scan.
 - Deploy scripts: `scripts/deploy_contract.sh`, `scripts/deploy_workload.sh`, `scripts/register_computation.sh`.
 
@@ -327,7 +342,7 @@ python3 scripts/verify_query.py \
 - Clone: `git clone <repository> /tmp/sealquery-clean`
 - `cargo fmt --all -- --check`: passed
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed
-- `cargo test --workspace`: 15 contract tests and 5 workload tests passed
+- `cargo test --workspace`: 25 contract tests and 5 workload tests passed
 - Approved workload WASM build: passed
 - Contract WASM build: passed
 - `./scripts/check_secrets.sh`: passed
@@ -489,7 +504,8 @@ python3 scripts/verify_query.py \
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback output is limited to 900 bytes; larger results would require off-chain delivery plus hash settlement.
 - Execution is limited to 180 seconds.
-- The demo supports two datasets across two owners, one approved computation per dataset, and one configured agent key.
+- The live demo has one owner-gated dataset and one approved computation. Dataset registration is not permissionless; multi-tenant onboarding still needs an owner-proof design.
+- Aggregate results are public on-chain and through the API. Raw rows are not delivered, but results are not exclusive to the buyer.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - The demo API is a single FastAPI process; Redis backs idempotency/rate limits when deployed, with an in-memory local fallback.
 - No central secret manager, on-call routing, or production dashboards are implemented.
