@@ -3,6 +3,7 @@ import type {
   Health,
   JobResponse,
   Metrics,
+  OwnerSummary,
   QueryRecord,
   State,
 } from "./types";
@@ -28,6 +29,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   state: () => request<State>("/api/state"),
   metrics: () => request<Metrics>("/api/metrics"),
+  ownerSummary: () => request<OwnerSummary>("/api/owner/summary"),
   health: () => request<Health>("/api/health"),
   queries: (limit = 20) =>
     request<{ agent: string; count: number; queries: QueryRecord[] }>(

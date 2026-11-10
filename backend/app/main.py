@@ -122,6 +122,11 @@ def events(limit: int = 50, db: Session = Depends(get_db)) -> dict:
     return {"count": len(items), "events": items}
 
 
+@app.get("/api/owner/summary")
+def owner_summary(db: Session = Depends(get_db)) -> dict:
+    return services.owner_summary(db)
+
+
 @app.post("/api/query", status_code=status.HTTP_202_ACCEPTED)
 def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
     if not rate_limiter.allow(_identity(request)):

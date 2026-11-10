@@ -108,6 +108,7 @@ API_URL=http://127.0.0.1:8000 pnpm dev`}
                     ["GET /api/queries/:id", "one query record"],
                     ["POST /api/query", "enqueue browser query; 202 + job_id"],
                     ["GET /api/jobs/:job_id", "poll browser job"],
+                    ["GET /api/owner/summary", "indexed owner earnings"],
                     ["POST /api/v1/query", "enqueue machine query; X-API-Key"],
                     ["GET /api/v1/jobs/:job_id", "poll machine job"],
                     ["POST /api/query/sync", "legacy synchronous browser query"],

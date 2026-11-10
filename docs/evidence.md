@@ -436,6 +436,8 @@ python3 scripts/verify_query.py \
 - Neardata event indexing is rate-limited to 20 blocks per indexer cycle by
   default; the polling indexer remains the historical fallback.
 - `GET /api/events` exposes recent indexed events.
+- `GET /api/owner/summary` returns indexed owner earnings; the local test DB
+  reported 2 owners, 16 settled queries, and `0.17 NEAR` gross owner reward.
 
 ## Known limitations
 

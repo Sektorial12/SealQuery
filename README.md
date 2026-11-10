@@ -331,6 +331,7 @@ API endpoints:
 - `GET /api/queries` — indexed query history
 - `GET /api/queries/<id>` — one indexed query record
 - `GET /api/events` — recent NEP-297 contract events
+- `GET /api/owner/summary` — indexed owner earnings and dataset history
 - `POST /api/query` — enqueue a browser query; returns `202` + `job_id`
 - `GET /api/jobs/<job_id>` — poll an async job
 - `POST /api/v1/query` — enqueue a machine query; requires `X-API-Key` when configured

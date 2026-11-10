@@ -216,3 +216,28 @@ export type JobResponse = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+
+export type OwnerDatasetSummary = {
+  dataset_id: string;
+  query_count: number;
+  settled: number;
+  refunded: number;
+  failed: number;
+  last_block: number;
+  gross_reward_yocto: string;
+};
+
+export type OwnerSummary = {
+  owners: Array<{
+    owner: string;
+    datasets: OwnerDatasetSummary[];
+    query_count: number;
+    settled: number;
+    refunded: number;
+    failed: number;
+    gross_reward_yocto: string;
+  }>;
+  datasets: number;
+  queries: number;
+};

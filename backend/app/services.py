@@ -973,3 +973,72 @@ def sync_events(db: Session) -> int:
         processed += 1
         invalidate_snapshot()
     return processed
+
+
+def owner_summary(db: Session) -> dict:
+    if db.query(DatasetRecord).count() == 0:
+        try:
+            sync_datasets(db)
+        except Exception:
+            pass
+    datasets = {row.dataset_id: row for row in db.query(DatasetRecord).all()}
+    queries = db.query(QueryRecord).all()
+    by_dataset: dict[str, dict] = {}
+    for query in queries:
+        entry = by_dataset.setdefault(
+            query.dataset_id,
+            {
+                "query_count": 0,
+                "settled": 0,
+                "refunded": 0,
+                "failed": 0,
+                "last_block": 0,
+            },
+        )
+        entry["query_count"] += 1
+        entry["last_block"] = max(entry["last_block"], query.created_block or 0)
+        if query.status == "settled":
+            entry["settled"] += 1
+        elif query.status == "refunded":
+            entry["refunded"] += 1
+        elif query.status == "failed":
+            entry["failed"] += 1
+
+    owners: dict[str, dict] = {}
+    for dataset_id, entry in by_dataset.items():
+        dataset = datasets.get(dataset_id)
+        owner = dataset.owner if dataset else "unknown"
+        reward = int(dataset.reward_yocto) if dataset else 0
+        gross = reward * entry["settled"]
+        summary = owners.setdefault(
+            owner,
+            {
+                "owner": owner,
+                "datasets": [],
+                "query_count": 0,
+                "settled": 0,
+                "refunded": 0,
+                "failed": 0,
+                "gross_reward_yocto": "0",
+            },
+        )
+        summary["datasets"].append(
+            {
+                "dataset_id": dataset_id,
+                "query_count": entry["query_count"],
+                "settled": entry["settled"],
+                "refunded": entry["refunded"],
+                "failed": entry["failed"],
+                "last_block": entry["last_block"],
+                "gross_reward_yocto": str(gross),
+            }
+        )
+        summary["query_count"] += entry["query_count"]
+        summary["settled"] += entry["settled"]
+        summary["refunded"] += entry["refunded"]
+        summary["failed"] += entry["failed"]
+        summary["gross_reward_yocto"] = str(
+            int(summary["gross_reward_yocto"]) + gross
+        )
+
+    return {"owners": list(owners.values()), "datasets": len(datasets), "queries": len(queries)}
