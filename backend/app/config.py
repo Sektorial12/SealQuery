@@ -32,10 +32,14 @@ class Settings(BaseSettings):
         ),
     )
     state_ttl_seconds: float = Field(
-        default=5.0,
+        default=15.0,
         validation_alias=AliasChoices(
             "SEALQUERY_STATE_TTL_SECONDS", "STATE_TTL_SECONDS"
         ),
+    )
+    trust_proxy_headers: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("TRUST_PROXY_HEADERS", "SEALQUERY_TRUST_PROXY_HEADERS"),
     )
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     indexer_interval_seconds: int = 15

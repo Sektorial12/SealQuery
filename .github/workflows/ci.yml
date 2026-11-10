@@ -108,4 +108,4 @@ jobs:
 
       - name: Reproducible contract build
         working-directory: contracts/sealquery
-        run: cargo near build reproducible-wasm --locked --no-abi
+        run: cargo near build reproducible-wasm

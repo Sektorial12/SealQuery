@@ -34,7 +34,7 @@ export default function QueryDetailPage() {
   const parsed = parseResult(query.result);
   const rows = parsed?.results ?? [];
   const rejected = query.status === "failed" || query.status === "refunded";
-  const badge = rejected ? (query.refund_tx ? "REJECTED · REFUNDED" : "FAILED") : query.status === "settled" ? "PROVEN" : "READY";
+  const badge = rejected ? (query.refund_tx ? "REJECTED · REFUNDED" : "FAILED") : query.status === "settled" ? "SETTLED" : "READY";
 
   return (
     <div className="space-y-4">

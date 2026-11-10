@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from . import services
@@ -57,7 +57,7 @@ def require_machine_auth(x_api_key: str | None = Header(default=None)) -> None:
 def _identity(request: Request, x_api_key: str | None = None) -> str:
     if x_api_key:
         return f"key:{x_api_key[:8]}"
-    forwarded = request.headers.get("x-forwarded-for", "")
+    forwarded = request.headers.get("x-forwarded-for", "") if settings.trust_proxy_headers else ""
     ip = forwarded.split(",")[0].strip() if forwarded else ""
     if not ip:
         ip = request.client.host if request.client else "unknown"
@@ -149,16 +149,8 @@ def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> di
         raise HTTPException(status_code=429, detail="rate limit exceeded")
     try:
         return services.enqueue_job(db, body)
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
-
-
-@app.post("/api/query/sync")
-def run_query_sync(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
-    if not rate_limiter.allow(_identity(request)):
-        raise HTTPException(status_code=429, detail="rate limit exceeded")
-    try:
-        return services.execute_query(db, body)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
@@ -177,30 +169,20 @@ def run_machine_query(
     if idempotency_key:
         cached = idempotency.get(idempotency_key)
         if cached is not None:
-            return cached
+            return JSONResponse(
+                content=cached,
+                status_code=200,
+                headers={"X-Idempotent-Replay": "true"},
+            )
     try:
         result = services.enqueue_job(db, body)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     if idempotency_key and result.get("ok"):
         idempotency.set(idempotency_key, result)
     return result
-
-
-@app.post("/api/v1/query/sync")
-def run_machine_query_sync(
-    request: Request,
-    body: dict,
-    x_api_key: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> dict:
-    require_machine_auth(x_api_key)
-    if not rate_limiter.allow(_identity(request, x_api_key)):
-        raise HTTPException(status_code=429, detail="rate limit exceeded")
-    try:
-        return services.execute_query(db, body)
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
 
 
 @app.get("/api/jobs/{job_id}")

@@ -39,7 +39,7 @@ services:
       - key: SEALQUERY_API_KEY
         generateValue: true
       - key: SEALQUERY_STATE_TTL_SECONDS
-        value: "5"
+        value: "15"
       - key: PROOF_DIR
         value: data/proofs
 

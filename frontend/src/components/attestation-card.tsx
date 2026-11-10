@@ -12,7 +12,13 @@ export function AttestationCard({ txHash }: { txHash: string }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["attestation", txHash],
     queryFn: () => api.attestation(txHash),
-    retry: false,
+    retry: 2,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const value = query.state.data;
+      if (value?.proven) return false;
+      return query.state.dataUpdateCount < 6 ? 5_000 : false;
+    },
   });
 
   if (isLoading) {

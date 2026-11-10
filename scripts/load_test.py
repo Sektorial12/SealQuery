@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import sys
 import time
@@ -46,7 +47,7 @@ def main() -> int:
         "errors": len(errors),
         "min_ms": round(timings[0], 1) if timings else None,
         "p50_ms": round(statistics.median(timings), 1) if timings else None,
-        "p95_ms": round(timings[int(len(timings) * 0.95) - 1], 1) if timings else None,
+        "p95_ms": round(timings[max(0, math.ceil(len(timings) * 0.95) - 1)], 1) if timings else None,
         "max_ms": round(timings[-1], 1) if timings else None,
     }
     print(json.dumps(report))

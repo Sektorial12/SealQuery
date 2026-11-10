@@ -111,8 +111,6 @@ API_URL=http://127.0.0.1:8000 pnpm dev`}
                     ["GET /api/owner/summary", "indexed owner earnings"],
                     ["POST /api/v1/query", "enqueue machine query; X-API-Key"],
                     ["GET /api/v1/jobs/:job_id", "poll machine job"],
-                    ["POST /api/query/sync", "legacy synchronous browser query"],
-                    ["POST /api/v1/query/sync", "legacy synchronous machine query"],
                     ["GET /api/attestation/:tx", "structured TDX report"],
                     ["GET /api/attestation/:tx/bundle", "download proof bundle"],
                   ].map(([path, note]) => (

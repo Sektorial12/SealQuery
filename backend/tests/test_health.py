@@ -5,6 +5,7 @@ os.environ.setdefault("AGENT_ACCOUNT", "agent.testnet")
 os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/sealquery-backend-test.db")
 os.environ.setdefault("REDIS_URL", "")
 os.environ.setdefault("INDEXER_ON_STARTUP", "0")
+os.environ.setdefault("SEALQUERY_API_KEY", "test-key")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -39,3 +40,36 @@ def test_ready() -> None:
         response = client.get("/api/ready")
     assert response.status_code == 200
     assert response.json()["database"] == "ok"
+
+
+def test_async_query_rejects_unlisted_dataset() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/query",
+            json={"dataset_id": "evil", "computation_id": "evil"},
+        )
+    assert response.status_code == 400
+
+
+def test_machine_query_requires_key_and_is_idempotent() -> None:
+    with TestClient(app) as client:
+        unauthorized = client.post(
+            "/api/v1/query",
+            json={"dataset_id": "retail_v1", "computation_id": "spend_growth_v1"},
+        )
+        assert unauthorized.status_code == 401
+
+        headers = {"X-API-Key": "test-key", "Idempotency-Key": "test-idem"}
+        first = client.post(
+            "/api/v1/query",
+            headers=headers,
+            json={"dataset_id": "retail_v1", "computation_id": "spend_growth_v1"},
+        )
+        second = client.post(
+            "/api/v1/query",
+            headers=headers,
+            json={"dataset_id": "retail_v1", "computation_id": "spend_growth_v1"},
+        )
+    assert first.status_code == 202
+    assert second.status_code == 200
+    assert first.json()["job_id"] == second.json()["job_id"]

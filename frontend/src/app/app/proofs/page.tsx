@@ -86,7 +86,7 @@ export default function ProofsPage() {
                 <p className="mt-1 font-mono text-[10px] text-faint">{short(query.tx_hash, 22, 12)}</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="pill pill-accent">PROVEN</span>
+                <span className="pill">{query.status}</span>
                 <span className="text-[10px] text-faint">verify →</span>
               </div>
             </button>

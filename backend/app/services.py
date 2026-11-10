@@ -212,7 +212,14 @@ def snapshot(db: Session) -> dict:
             cached_at, cached = _snapshot_cache
             if cached is not None and now - cached_at < settings.state_ttl_seconds:
                 return cached
-        result = _build_snapshot(db)
+        try:
+            result = _build_snapshot(db)
+        except Exception:
+            with _cache_lock:
+                cached_at, cached = _snapshot_cache
+                if cached is not None:
+                    return cached
+            raise
         with _cache_lock:
             _snapshot_cache = (time.time(), result)
         return result
@@ -470,80 +477,6 @@ def get_query(db: Session, query_id: int) -> dict | None:
     return query_to_dict(record)
 
 
-def execute_query(db: Session, body: dict[str, Any]) -> dict:
-    dataset_id = body.get("dataset_id", settings.datasets[0][0])
-    computation_id = body.get("computation_id", settings.datasets[0][1])
-    params = body.get("params") or DEFAULT_PARAMS
-    dataset = agent_client.rpc_view(settings.contract_account, "get_dataset", {"dataset_id": dataset_id})
-    owner = dataset["owner"]
-    owner_before = account_balance(owner)
-    query_id, tx_hash = agent_client.request_query(
-        settings.contract_account,
-        settings.agent_account,
-        dataset_id,
-        computation_id,
-        params,
-    )
-    query = agent_client.wait_for_result(settings.contract_account, query_id)
-    result = None
-    if query.get("result"):
-        try:
-            result = json.loads(query["result"])
-        except json.JSONDecodeError:
-            result = query["result"]
-
-    proof = False
-    proof_output = ""
-    accept_tx = None
-    refund_tx = None
-    if query["status"] == "ready":
-        proof, proof_output = agent_client.verify_attestation(tx_hash, None)
-        if proof:
-            accept_tx = agent_client.near_call(
-                settings.contract_account,
-                "accept_result",
-                {"query_id": query_id},
-                settings.agent_account,
-                "0 NEAR",
-            )
-    elif query["status"] == "failed":
-        refund_tx = agent_client.near_call(
-            settings.contract_account,
-            "refund_query",
-            {"query_id": query_id},
-            settings.agent_account,
-            "0 NEAR",
-        )
-
-    response_status = query["status"]
-    if accept_tx or refund_tx:
-        try:
-            query = agent_client.rpc_view(
-                settings.contract_account, "get_query", {"query_id": query_id}
-            )
-        except Exception:
-            pass
-    upsert_query(db, query_id, query, tx_hash, accept_tx, refund_tx)
-    db.commit()
-    invalidate_snapshot()
-    return {
-        "ok": True,
-        "dataset_id": dataset_id,
-        "computation_id": computation_id,
-        "query_id": query_id,
-        "tx_hash": tx_hash,
-        "status": response_status,
-        "result": result,
-        "proof": proof,
-        "proof_output": proof_output,
-        "accept_tx": accept_tx,
-        "refund_tx": refund_tx,
-        "owner": owner,
-        "owner_before": owner_before,
-        "owner_after": account_balance(owner),
-    }
-
-
 def job_to_dict(job: JobRecord) -> dict:
     result = None
     if job.result:
@@ -577,6 +510,8 @@ def job_to_dict(job: JobRecord) -> dict:
 def enqueue_job(db: Session, body: dict[str, Any]) -> dict:
     dataset_id = body.get("dataset_id", settings.datasets[0][0])
     computation_id = body.get("computation_id", settings.datasets[0][1])
+    if (dataset_id, computation_id) not in settings.datasets:
+        raise ValueError("dataset/computation is not in the configured demo allowlist")
     params = body.get("params") or DEFAULT_PARAMS
     job = JobRecord(
         job_id=uuid.uuid4().hex,
@@ -620,6 +555,8 @@ def _job_fail(db: Session, job: JobRecord, message: str, status: str = "error") 
 
 def run_job(db: Session, job: JobRecord) -> None:
     try:
+        if (job.dataset_id, job.computation_id) not in settings.datasets:
+            raise ValueError("dataset/computation is not in the configured demo allowlist")
         dataset = agent_client.rpc_view(
             settings.contract_account, "get_dataset", {"dataset_id": job.dataset_id}
         )

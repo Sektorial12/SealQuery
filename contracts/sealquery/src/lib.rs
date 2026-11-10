@@ -158,8 +158,8 @@ impl SealQuery {
         if allowed_computations.is_empty() {
             env::panic_str("at least one computation must be allowed");
         }
-        if reward_yocto.0 > price_yocto.0 || compute_deposit_yocto.0 > price_yocto.0 {
-            env::panic_str("reward and compute deposit must not exceed price");
+        if reward_yocto.0.saturating_add(compute_deposit_yocto.0) > price_yocto.0 {
+            env::panic_str("reward plus compute deposit must not exceed price");
         }
         if budget_per_day == 0 || budget_per_day > MAX_QUERIES_PER_DAY {
             env::panic_str("budget_per_day must be between 1 and 1000");
@@ -231,8 +231,16 @@ impl SealQuery {
         if dataset.owner != caller {
             env::panic_str("only the dataset owner can update economics");
         }
-        if reward_yocto.0 > price_yocto.0 || compute_deposit_yocto.0 > price_yocto.0 {
-            env::panic_str("reward and compute deposit must not exceed price");
+        if reward_yocto.0.saturating_add(compute_deposit_yocto.0) > price_yocto.0 {
+            env::panic_str("reward plus compute deposit must not exceed price");
+        }
+        if self
+            .queries_by_dataset
+            .get(&dataset_id)
+            .map(|ids| !ids.is_empty())
+            .unwrap_or(false)
+        {
+            env::panic_str("cannot change economics after queries");
         }
         if budget_per_day == 0 || budget_per_day > MAX_QUERIES_PER_DAY {
             env::panic_str("budget_per_day must be between 1 and 1000");
@@ -266,6 +274,9 @@ impl SealQuery {
             .any(|item| item == &operation)
         {
             env::panic_str("operation is not allowed for this dataset");
+        }
+        if self.computations.contains_key(&computation_id) {
+            env::panic_str("computation already exists");
         }
         validate_hash(&wasm_hash);
         self.computations.insert(
@@ -428,6 +439,13 @@ impl SealQuery {
 
     #[private]
     pub fn on_query_result(&mut self, query_id: u64) {
+        match self.queries.get(&query_id) {
+            Some(query) if query.status == "pending" => {}
+            _ => {
+                env::log_str("query callback ignored for non-pending query");
+                return;
+            }
+        }
         let status = match env::promise_result_checked(0, 10_000) {
             Ok(data) => {
                 let text = String::from_utf8(data).unwrap_or_default();
@@ -523,14 +541,6 @@ impl SealQuery {
             })
         ));
         Promise::new(query.agent).transfer(NearToken::from_yoctonear(query.deposit_yocto.0))
-    }
-
-    pub fn withdraw_contract_balance(&mut self) -> Promise {
-        self.assert_owner();
-        let amount = env::account_balance().as_yoctonear();
-        let reserve = NearToken::from_millinear(100).as_yoctonear();
-        let withdraw = amount.saturating_sub(reserve);
-        Promise::new(self.owner.clone()).transfer(NearToken::from_yoctonear(withdraw))
     }
 
     pub fn get_dataset(&self, dataset_id: String) -> Dataset {
@@ -718,6 +728,7 @@ mod tests {
     use super::*;
     use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::testing_env;
+    use near_sdk::PromiseResult;
 
     const DATA_HASH: &str = "65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983";
     const WASM_HASH: &str = "3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47";
@@ -901,7 +912,101 @@ mod tests {
     }
 
     #[test]
+    fn late_callback_does_not_overwrite_refunded_query() {
+        let (mut contract, _owner) = setup();
+        contract.queries.insert(
+            1,
+            Query {
+                agent: account("agent.testnet"),
+                dataset_id: "retail_v1".to_string(),
+                computation_id: "spend_growth_v1".to_string(),
+                deposit_yocto: U128(20_000_000_000_000_000_000_000),
+                status: "refunded".to_string(),
+                result: None,
+                created_block: 0,
+            },
+        );
+        testing_env!(
+            VMContextBuilder::new().build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![PromiseResult::Successful(br#"{"ok":true}"#.to_vec())],
+        );
+        contract.on_query_result(1);
+        assert_eq!(contract.get_query(1).status, "refunded");
+    }
+
+    #[test]
+    fn late_callback_does_not_overwrite_settled_query() {
+        let (mut contract, _owner) = setup();
+        contract.queries.insert(
+            1,
+            Query {
+                agent: account("agent.testnet"),
+                dataset_id: "retail_v1".to_string(),
+                computation_id: "spend_growth_v1".to_string(),
+                deposit_yocto: U128(20_000_000_000_000_000_000_000),
+                status: "settled".to_string(),
+                result: Some("{}".to_string()),
+                created_block: 0,
+            },
+        );
+        testing_env!(
+            VMContextBuilder::new().build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![PromiseResult::Successful(br#"{"ok":true}"#.to_vec())],
+        );
+        contract.on_query_result(1);
+        assert_eq!(contract.get_query(1).status, "settled");
+    }
+
+    #[test]
+    #[should_panic(expected = "computation already exists")]
+    fn rejects_duplicate_computation_id() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+    }
+
+    #[test]
+    #[should_panic(expected = "reward plus compute deposit must not exceed price")]
+    fn rejects_economics_that_exceed_price() {
+        let (mut contract, _owner) = setup();
+        contract.register_dataset(
+            "retail_v1".to_string(),
+            "retail_v1".to_string(),
+            DATA_HASH.to_string(),
+            vec!["spend_growth".to_string()],
+            U128(20_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            U128(11_000_000_000_000_000_000_000),
+            20,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot change economics after queries")]
+    fn rejects_economics_change_after_query() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        contract
+            .queries_by_dataset
+            .insert("retail_v1".to_string(), vec![1]);
+        contract.update_dataset_economics(
+            "retail_v1".to_string(),
+            U128(20_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            20,
+        );
+    }
+
+    #[test]
     fn version_is_exposed() {
-        assert_eq!(SealQuery::version(), "0.2.0");
+        assert_eq!(SealQuery::version(), "0.2.1");
     }
 }

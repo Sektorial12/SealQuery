@@ -37,7 +37,9 @@ const secondary = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { data } = useQuery({ queryKey: ["state"], queryFn: api.state, refetchInterval: 20_000 });
+  const { data, isError } = useQuery({ queryKey: ["state"], queryFn: api.state, refetchInterval: 20_000 });
+  const networkLabel = isError ? "Unavailable" : !data ? "Connecting" : data.paused ? "Paused" : "Live";
+  const networkClass = isError || data?.paused ? "pill-danger" : data ? "pill-accent" : "pill-warning";
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,8 +76,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mt-auto rounded-2xl border border-line bg-panel-2 p-3">
             <div className="flex items-center justify-between">
               <span className="metric-label">Network</span>
-              <span className={cn("pill", data?.paused ? "pill-danger" : "pill-accent")}>
-                {data?.paused ? "Paused" : "Live"}
+              <span className={cn("pill", networkClass)}>
+                {networkLabel}
               </span>
             </div>
             <p className="mt-2 truncate font-mono text-[10px] text-muted" title={data?.contract}>
@@ -97,7 +99,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">Agent workspace</p>
                   <p className="truncate text-[11px] text-muted">
-                    {data?.agent ? `agent ${short(data.agent, 12, 8)}` : "connecting to testnet…"}
+                    {isError
+                      ? "agent unavailable"
+                      : data?.agent
+                        ? `agent ${short(data.agent, 12, 8)}`
+                        : "connecting to testnet…"}
                   </p>
                 </div>
               </div>

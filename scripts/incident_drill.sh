@@ -52,19 +52,34 @@ echo "paused=true"
 
 echo "== query while paused"
 http_code="$(
-  curl -s -o "$drill_dir/query.json" -w '%{http_code}' \
+  curl -s -o "$drill_dir/enqueue.json" -w '%{http_code}' \
     -X POST "$API_URL/api/query" \
     -H 'Content-Type: application/json' \
     -d '{"dataset_id":"retail_v1","computation_id":"spend_growth_v1"}'
 )"
-cat "$drill_dir/query.json"
+cat "$drill_dir/enqueue.json"
 echo
-if [[ "$http_code" != "500" ]]; then
-  echo "FAIL: expected HTTP 500 while paused, got $http_code" >&2
+if [[ "$http_code" != "202" ]]; then
+  echo "FAIL: expected HTTP 202 from the async API, got $http_code" >&2
   exit 1
 fi
-if ! grep -q 'paused' "$drill_dir/query.json"; then
-  echo "FAIL: rejection did not mention paused" >&2
+job_id="$(jq -r '.job_id // empty' "$drill_dir/enqueue.json")"
+if [[ -z "$job_id" ]]; then
+  echo "FAIL: no job_id returned" >&2
+  exit 1
+fi
+for _ in $(seq 1 60); do
+  curl -fsS "$API_URL/api/jobs/$job_id" -o "$drill_dir/job.json"
+  status="$(jq -r '.status' "$drill_dir/job.json")"
+  if [[ "$status" == "error" || "$status" == "failed" || "$status" == "refunded" ]]; then
+    break
+  fi
+  sleep 1
+done
+cat "$drill_dir/job.json"
+echo
+if ! grep -q 'paused' "$drill_dir/job.json"; then
+  echo "FAIL: worker rejection did not mention paused" >&2
   exit 1
 fi
 

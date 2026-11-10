@@ -319,7 +319,6 @@ API endpoints:
 - `GET /api/jobs/<job_id>` — poll a browser job
 - `POST /api/v1/query` — enqueue a machine query; requires `X-API-Key` when configured
 - `GET /api/v1/jobs/<job_id>` — poll a machine job
-- `POST /api/query/sync` / `POST /api/v1/query/sync` — legacy synchronous routes
 - `GET /api/proof/<tx_hash>` — re-run attestation verification
 - `GET /api/attestation/<tx_hash>` — structured TDX attestation report
 - `GET /api/attestation/<tx_hash>/bundle` — downloadable proof bundle

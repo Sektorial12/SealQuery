@@ -50,7 +50,7 @@ Read-path load test:
 python3 scripts/load_test.py --requests 10 --concurrency 3
 ```
 
-The state endpoint has a 5-second cache (`SEALQUERY_STATE_TTL_SECONDS`). The
+The state endpoint has a 15-second cache (`SEALQUERY_STATE_TTL_SECONDS`) and falls back to the last successful snapshot during transient RPC failures. The
 2026-11-09 run with 6 requests and concurrency 3 returned 0 errors and p95
 `54.9 ms` warm. A cold state read was `4.15 s`; RPC-backed reads are cached
 briefly to avoid public-RPC rate limits. The agent RPC client limits concurrent
