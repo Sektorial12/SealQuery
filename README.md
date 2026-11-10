@@ -100,7 +100,7 @@ cd contracts/sealquery
 cargo near build reproducible-wasm
 ```
 
-Expected v2 contract hash: `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
+Expected v0.2.1 contract hash: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`, built from commit `6cf4ce3`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 
@@ -473,6 +473,8 @@ Highlights:
 - Load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm.
 - Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
 - Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
+- Hardened contract v0.2.1: late callbacks no longer overwrite refunded/settled queries, duplicate computation IDs are rejected, economics changes after queries are blocked, and owner escrow withdrawal is removed.
+- Hosted async query `32` after the contract upgrade: task `41071`, `PROVEN`, settled.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
 ## Known limitations
@@ -486,6 +488,8 @@ Highlights:
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
 - The demo API is a single FastAPI process; Redis holds idempotency and rate-limit state when deployed, and in-memory fallback is used locally.
 - Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
+- The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget.
+- Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 

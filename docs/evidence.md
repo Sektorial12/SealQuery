@@ -53,7 +53,7 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Current upload transaction: `9XvfEPBmQXmkLmiiaG4fDUDeKat7SRabJz3qTaccdWxE`
 - Computation update transaction: `3wqMpjaMHnfU3gJYui6tg1njQuEimBaSQsKdHdgpqrX9`
 - The earlier proof used workload hash `0f20f00c…`; the current source builds to `3b1bc4ea…`.
-- Local unit tests: 8 contract tests and 5 workload tests passed
+- Local unit tests: 15 contract tests and 5 workload tests passed
 - Test command:
   ```bash
   cargo test -p sealquery-workload
@@ -90,8 +90,12 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 
 - v2 deployer: `sealquery-v2-1794194344.testnet`
 - v2 contract: `contract.sealquery-v2-1794194344.testnet`
-- Contract version: `0.2.0`
-- v2 code SHA-256 (reproducible build): `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`
+- Contract version at the original deploy (historical): `0.2.0`
+- Live contract version: `0.2.1`
+- v2 code SHA-256 at the original deploy (historical): `3c96314f65221702b1851454e0e2592ab277f8bb274cc1420c6e648dedb5c2d4`
+- Hardened v0.2.1 code SHA-256: `1f9662513bb27354e2289545ad4aecada25acf3301c9c90578ee26bef5a6354e`
+- Hardened deploy transaction: `GSPnhNo8izDYVPoVQytYYSSSEJrxRB9BagHZVZy3d5HN`
+- Hardened source commit: `6cf4ce3`
 - Contract account funding transaction: `98B7gLLQRMfBbHMNtzMGz7Gp8wHABVpKscFETXRNvquh`
 - Initial deploy transaction: `dL3mcj92RyifeLzud5d4WdbxLYvYPQ9Z33kMssKTR4j`
 - Reproducible code deploy transaction: `DmA4RP8JvQFyTv9a4Yxu1R3D8f1MpEUw2Dv99EV5bbEX`
@@ -182,6 +186,18 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   - `get_queries_for_agent(agent2)`: `[1,2,3,4,5,6]`
   - `get_queries_for_dataset(retail_v1)`: `[1,3,4,5,6]`
   - `get_queries_for_dataset(retail_alt)`: `[2]`
+
+## Contract settlement hardening
+
+- `on_query_result` ignores callbacks unless the query is still `pending`.
+- `refund_query` remains terminal for settled/refunded queries.
+- Duplicate `computation_id` values are rejected.
+- `reward + compute_deposit <= price` is enforced.
+- Dataset economics cannot change after the dataset has queries.
+- The owner-only `withdraw_contract_balance` method was removed.
+- Added contract tests for late callbacks after refund/settlement, duplicate
+  computations, economics overflow, and post-query economics changes.
+- Hosted query `32` after the v0.2.1 upgrade: task `41071`, `PROVEN`, settled.
 
 ## End-to-end query
 
@@ -309,7 +325,7 @@ python3 scripts/verify_query.py \
 - Clone: `git clone <repository> /tmp/sealquery-clean`
 - `cargo fmt --all -- --check`: passed
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed
-- `cargo test --workspace`: 8 contract tests and 5 workload tests passed
+- `cargo test --workspace`: 15 contract tests and 5 workload tests passed
 - Approved workload WASM build: passed
 - Contract WASM build: passed
 - `./scripts/check_secrets.sh`: passed
@@ -478,4 +494,5 @@ python3 scripts/verify_query.py \
 - Paid concurrent-query load and a full OutLayer outage simulation are not run.
 - Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
 - The UI uses the server-side demo agent; a human wallet connection is deferred.
+- The browser query endpoint is allowlisted to configured demo datasets but remains key-free and can spend within the agent budget.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.

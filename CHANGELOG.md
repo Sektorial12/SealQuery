@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-11-10
+
+- Fixed the late-callback/refund state machine and added replay/duplicate-refund tests.
+- Rejected duplicate computation IDs and enforced the economics invariant.
+- Blocked economics changes after a dataset has queries.
+- Removed owner escrow withdrawal.
+- Allowlisted browser query datasets and removed synchronous paid routes.
+- Added RPC snapshot fallback, stricter proxy handling, UI attestation retries, and honest proof badges.
+- Updated the async incident drill and p95 calculation.
+
 ## 0.3.4 — 2026-11-10
 
 - Made event indexing and service heartbeats idempotent under replay/restart races.
