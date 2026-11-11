@@ -83,6 +83,14 @@ is assumed, and what remains unsolved. It is not a production security audit.
   TEE does not prove the approved computation is semantically correct. No
   on-chain TDX quote verification is claimed.
 
+### Attestation identity scope
+
+The online verifier checks the OutLayer worker measurement and task binding. SealQuery
+does not independently compare the executed application wasm hash in the report to the
+registered computation; the contract pins the requested source version and the workload
+checks the dataset hash. Offline bundle identity depends on unsigned bundle metadata.
+This is a known gap for a production deployment.
+
 ### Callback and result manipulation
 
 - **Threat:** a malicious callback changes the result, replays an old result, or

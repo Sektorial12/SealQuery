@@ -222,6 +222,9 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   (1 NEAR). A hosted query failed before submission when the agent had 0.219
   NEAR because the near CLI reserves the 0.02 deposit plus a 0.2 NEAR gas
   ceiling; the worker now reports low balance before submitting.
+- Hosted query `39` after output binding and funding: task `48761`, `PROVEN`,
+  settled; request `GvJGipmmHzY2Ty2AwEWZAjZhb6aZWDqYfKFu1td3tqih`, accept
+  `EbWc19Wr3N3vqWrrhrbaAkgYHJrrqL3XQbdZUSjWCwck`.
 - Ready-result regression on the live v0.2.2 contract: query `37` request
   `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`; after the callback set it
   `ready`, `refund_query` was rejected with
@@ -234,6 +237,10 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Post-upgrade async incident drill on v0.5.0 API: job
   `a8929f45227d461ca71d469b3d712deb` failed fast with `contract is paused`;
   pause/unpause finished with `DRILL PASSED`.
+- Event indexer backfill: q37 request tx `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`
+  and settlement tx `2nVhVTfXKcUuhbxsZa1HaMcEyAm8viBcjzXuDYWmc4Wo` are indexed;
+  `/api/events` newest is q37. Public Neardata rates limit catch-up to about
+  30 blocks/minute, so later events can lag.
 
 ## End-to-end query
 
@@ -529,6 +536,11 @@ python3 scripts/verify_query.py \
 - Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
 - Cohort counts are distinct invoices, not distinct people; no differential privacy.
 - Contract state has no migration path yet.
+- The verifier's identity check covers the OutLayer worker measurement. SealQuery does not
+  independently compare the executed application wasm hash in the attestation report to
+  the registered computation; the contract pins the source version in the request.
+- Offline bundle identity relies on unsigned `measurements_approved` metadata in the bundle;
+  online verification checks the chain.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - The demo API is a single FastAPI process; Redis backs idempotency/rate limits when deployed, with an in-memory local fallback.
 - No central secret manager, on-call routing, or production dashboards are implemented.

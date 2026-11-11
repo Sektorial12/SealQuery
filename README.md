@@ -487,6 +487,7 @@ Highlights:
 - The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset, and its budget was reset for judging.
 - Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
 - Hosted async query `38` after funding the demo agent: task `47539`, `PROVEN`, settled.
+- Hosted async query `39` after output-binding checks: task `48761`, `PROVEN`, settled.
 - Live ready-result regression: query `37` was left ready; `refund_query` was rejected with `ready query must be settled, not refunded`, then `settle_query` paid the owner after timeout.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
@@ -500,7 +501,7 @@ Highlights:
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
 - The demo API is a single FastAPI process; Redis holds idempotency and rate-limit state when deployed, and in-memory fallback is used locally.
-- Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
+- Public Neardata is limited to about 30 blocks/minute, so recent event indexing can lag; query polling and the DB still cover the demo.
 - The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget, and the UI disables the action when the daily budget is exhausted.
 - Paid aggregate results are public on-chain and through the API; raw rows are never delivered. The UI labels this explicitly.
 - Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
