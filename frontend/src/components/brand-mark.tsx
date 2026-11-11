@@ -7,9 +7,9 @@ export function BrandMark({ className }: { className?: string }) {
     <Image
       src={logo}
       alt=""
-      width={36}
+      width={48}
       height={36}
-      className={cn("size-9 object-contain", className)}
+      className={cn("h-9 w-12 shrink-0 object-contain", className)}
       priority
     />
   );
