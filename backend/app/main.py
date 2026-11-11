@@ -16,6 +16,7 @@ from .store import IdempotencyStore, RateLimiter
 
 settings = get_settings()
 rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+proof_limiter = RateLimiter(max(30, settings.rate_limit_per_minute * 6))
 idempotency = IdempotencyStore(settings.idempotency_ttl_seconds)
 
 
@@ -34,7 +35,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.5.2",
+    version="0.5.3",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )
@@ -227,13 +228,17 @@ def machine_query(
 
 
 @app.get("/api/proof/{tx_hash}")
-def proof(tx_hash: str) -> dict:
+def proof(tx_hash: str, request: Request) -> dict:
+    if not proof_limiter.allow(_identity(request)):
+        raise HTTPException(status_code=429, detail="proof rate limit exceeded")
     proven, output = services.agent_client.verify_attestation(tx_hash, None)
     return {"proven": proven, "output": output}
 
 
 @app.get("/api/attestation/{tx_hash}")
-def attestation(tx_hash: str) -> dict:
+def attestation(tx_hash: str, request: Request) -> dict:
+    if not proof_limiter.allow(_identity(request)):
+        raise HTTPException(status_code=429, detail="proof rate limit exceeded")
     proven, report = services.agent_client.verify_attestation_json(tx_hash, None)
     if isinstance(report, dict):
         return {"proven": proven, "attestation": report}
@@ -241,7 +246,9 @@ def attestation(tx_hash: str) -> dict:
 
 
 @app.get("/api/attestation/{tx_hash}/bundle")
-def attestation_bundle(tx_hash: str) -> FileResponse:
+def attestation_bundle(tx_hash: str, request: Request) -> FileResponse:
+    if not proof_limiter.allow(_identity(request)):
+        raise HTTPException(status_code=429, detail="proof rate limit exceeded")
     proof_dir = services._path(settings.proof_dir)
     proof_dir.mkdir(parents=True, exist_ok=True)
     proof_path = proof_dir / f"{tx_hash}.json"

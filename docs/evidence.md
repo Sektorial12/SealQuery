@@ -215,6 +215,13 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Post-v0.2.2 query `36`: task `45967`, `PROVEN`, settled; request
   `G7UEUxyenoruZzQiheLeCM7ND58Kd2dU6vRKdTdpo2YA`, accept
   `EVUoAdUKMhxfDiuVUU9JeFHd8SAmo6R56qgyx4hGLVGK`.
+- Hosted query `38` after funding: task `47539`, `PROVEN`, settled; request
+  `4XToxi52hbQBm4NSB6NZPcT6BfHUcQgCXZE5WprD5y6T`, accept
+  `Bn6BjDudhayX4u6dzhj5R2xEENKehGs2AbkgZ3S97evf`.
+- Agent funding transaction: `4fNeT6i989owbCMQdsm98MSkckmhMU3xwCobUJ2snvde`
+  (1 NEAR). A hosted query failed before submission when the agent had 0.219
+  NEAR because the near CLI reserves the 0.02 deposit plus a 0.2 NEAR gas
+  ceiling; the worker now reports low balance before submitting.
 - Ready-result regression on the live v0.2.2 contract: query `37` request
   `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`; after the callback set it
   `ready`, `refund_query` was rejected with
@@ -516,9 +523,12 @@ python3 scripts/verify_query.py \
 - The dataset is public and used as a private-data stand-in.
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback output is limited to 900 bytes; larger results would require off-chain delivery plus hash settlement.
-- Execution is limited to 180 seconds.
+- OutLayer execution is limited to 60 seconds by the contract request; the worker waits up to 90 seconds for the callback.
 - The live demo has one owner-gated dataset and one approved computation. Dataset registration is not permissionless; multi-tenant onboarding still needs an owner-proof design.
 - Aggregate results are public on-chain and through the API. Raw rows are not delivered, but results are not exclusive to the buyer.
+- Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
+- Cohort counts are distinct invoices, not distinct people; no differential privacy.
+- Contract state has no migration path yet.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - The demo API is a single FastAPI process; Redis backs idempotency/rate limits when deployed, with an in-memory local fallback.
 - No central secret manager, on-call routing, or production dashboards are implemented.

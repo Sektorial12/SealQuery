@@ -16,6 +16,7 @@ def main() -> None:
     while True:
         db = SessionLocal()
         try:
+            heartbeat(db, "indexer", "syncing")
             now = time.time()
             datasets = 0
             queries = 0
@@ -37,6 +38,10 @@ def main() -> None:
         except Exception as error:
             db.rollback()
             print(f"indexer error: {error}", flush=True)
+            try:
+                heartbeat(db, "indexer", f"error: {error}")
+            except Exception:
+                db.rollback()
             time.sleep(max(settings.event_indexer_interval_seconds, 60))
             continue
         finally:

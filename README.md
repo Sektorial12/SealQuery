@@ -284,6 +284,9 @@ The production-facing app lives in `frontend/` (Next.js + TypeScript). It uses t
 FastAPI service.
 
 ```bash
+export CONTRACT_ACCOUNT=<contract.testnet>
+export AGENT_ACCOUNT=<agent.testnet>
+export NEAR_ACCESS_KEY_FILE=<local-or-mounted-key.json>  # only needed to sign worker jobs
 # terminal 1: FastAPI on :8000
 ./scripts/run_backend.sh
 
@@ -450,7 +453,7 @@ near contract call-function as-read-only '<contract>' get_queries_for_agent \
 - Dataset stays in OutLayer encrypted worker storage; only the approved WASM can read it.
 - The compute secret is readable only when the SealQuery contract is the predecessor account.
 - The approved computation accepts only allowed countries and periods.
-- Minimum cohort: 100.
+- Minimum cohort: 100 distinct **invoices** in this workload, not 100 people.
 - Output rounding: spend to nearest 1,000; growth to 0.1%.
 - Cohort sizes are reported as `100+` or `suppressed`.
 - Per-agent, per-dataset daily budget: 20 queries.
@@ -483,6 +486,7 @@ Highlights:
 - Hosted async query `32` after the first contract upgrade: task `41071`, `PROVEN`, settled.
 - The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset, and its budget was reset for judging.
 - Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
+- Hosted async query `38` after funding the demo agent: task `47539`, `PROVEN`, settled.
 - Live ready-result regression: query `37` was left ready; `refund_query` was rejected with `ready query must be settled, not refunded`, then `settle_query` paid the owner after timeout.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 
@@ -491,7 +495,7 @@ Highlights:
 - The dataset is public and used as a private-data stand-in.
 - OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
 - The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
-- Execution is limited to 180 seconds.
+- OutLayer execution is limited to 60 seconds by the contract request; the worker waits up to 90 seconds for the callback.
 - One live demo dataset. The contract supports multiple datasets, but registration is contract-owner gated to prevent copying an existing hash/version under another owner.
 - Differential privacy and a full marketplace discovery/ordering layer are not implemented.
 - Cross-chain payments and NEAR Intents are intentionally out of scope.
@@ -499,6 +503,9 @@ Highlights:
 - Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
 - The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget, and the UI disables the action when the daily budget is exhausted.
 - Paid aggregate results are public on-chain and through the API; raw rows are never delivered. The UI labels this explicitly.
+- Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
+- The cohort is distinct invoices, not distinct people. No differential privacy.
+- Contract state has no migration path yet.
 - Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
 - Dataset registration is contract-owner gated, so multi-tenant onboarding is not permissionless yet.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.

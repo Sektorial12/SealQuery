@@ -185,7 +185,7 @@ export default function HomePage() {
         <div className="relative overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-br from-accent/[0.10] via-panel to-accent-2/[0.08] p-8 sm:p-12">
           <div className="absolute right-0 top-0 size-72 rounded-full bg-accent/10 blur-3xl" />
           <div className="relative max-w-2xl">
-            <div className="flex items-center gap-2 text-accent"><Sparkles size={16} /><span className="text-[11px] font-bold uppercase tracking-[0.18em]">Testnet production prototype</span></div>
+            <div className="flex items-center gap-2 text-accent"><Sparkles size={16} /><span className="text-[11px] font-bold uppercase tracking-[0.18em]">Testnet demo</span></div>
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Run the full loop on NEAR testnet.</h2>
             <p className="mt-3 text-sm leading-7 text-muted">
               Start with the agent console, inspect a real proof, then download the bundle and verify it

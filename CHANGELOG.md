@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 — 2026-11-11
+
+- Added proof-endpoint rate limiting, an indexer error heartbeat, sitemap output,
+  and owner summaries filtered to configured datasets.
+- Documented the agent gas reserve, public aggregates, invoice-based cohorts, and
+  trapped compute surplus.
+
 ## 0.5.2 — 2026-11-11
 
 - Made idempotency reservation atomic and rate-limit identity use the trusted proxy hop.

@@ -32,6 +32,13 @@ near contract call-function as-transaction "$CONTRACT_ACCOUNT" reset_budget \
 Dataset registration is contract-owner gated. This is intentionally stricter
 than a permissionless marketplace until owner-proof binding is implemented.
 
+## Agent funding
+
+The demo agent must hold enough NEAR to cover the attached deposit plus the near
+CLI's 200 Tgas gas ceiling (about 0.22 NEAR per query). Fund at least 1 NEAR for
+a demo session. The worker rejects a job before submission when the balance is
+below 0.3 NEAR, and `/api/metrics` raises `low_agent_balance`.
+
 ## Monitoring
 
 ```bash

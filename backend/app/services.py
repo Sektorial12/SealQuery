@@ -1013,8 +1013,15 @@ def owner_summary(db: Session) -> dict:
             sync_datasets(db)
         except Exception:
             pass
-    datasets = {row.dataset_id: row for row in db.query(DatasetRecord).all()}
-    queries = db.query(QueryRecord).all()
+    configured = {dataset_id for dataset_id, _ in settings.datasets}
+    datasets = {
+        row.dataset_id: row
+        for row in db.query(DatasetRecord).all()
+        if row.dataset_id in configured
+    }
+    queries = [
+        row for row in db.query(QueryRecord).all() if row.dataset_id in configured
+    ]
     by_dataset: dict[str, dict] = {}
     for query in queries:
         entry = by_dataset.setdefault(
