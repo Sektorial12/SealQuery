@@ -118,6 +118,24 @@ def rpc_view(contract: str, method: str, args: dict) -> dict:
     raise RuntimeError(f"RPC view failed after retries: {last_error}")
 
 
+def _run_transaction(command: list[str], agent: str) -> str:
+    output = ""
+    for attempt in range(3):
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
+        output = completed.stdout + completed.stderr
+        tx_match = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
+        if completed.returncode == 0:
+            return output
+        if tx_match:
+            _raise_failure(tx_match.group(1), agent, output)
+        if "expired" in output.lower() and attempt < 2:
+            time.sleep(1 + attempt)
+            continue
+        _raise_failure(None, agent, output)
+    _raise_failure(None, agent, output)
+    return output
+
+
 def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) -> str:
     command = [
         "near",
@@ -143,11 +161,8 @@ def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) 
         )
     else:
         command.extend(["sign-with-keychain", "send"])
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
-    output = completed.stdout + completed.stderr
+    output = _run_transaction(command, agent)
     match = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
-    if completed.returncode != 0:
-        _raise_failure(match.group(1) if match else None, agent, output)
     if not match:
         raise RuntimeError("transaction id not found in near CLI output")
     return match.group(1)
@@ -196,11 +211,8 @@ def request_query(contract: str, agent: str, dataset: str, computation: str, par
         )
     else:
         command.extend(["sign-with-keychain", "send"])
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
-    output = completed.stdout + completed.stderr
+    output = _run_transaction(command, agent)
     tx_hash = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
-    if completed.returncode != 0:
-        _raise_failure(tx_hash.group(1) if tx_hash else None, agent, output)
     if not tx_hash:
         raise RuntimeError("transaction id not found in near CLI output")
     return parse_query_id(output), tx_hash.group(1)

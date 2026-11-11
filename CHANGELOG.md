@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2 — 2026-11-11
+
+- Retried near CLI submissions that fail with an expired transaction before
+  broadcast (no transaction ID).
+
 ## 0.6.1 — 2026-11-11
 
 - Retried transient attestation verification and acceptance calls.
