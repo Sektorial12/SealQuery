@@ -611,7 +611,12 @@ def run_job(db: Session, job: JobRecord) -> None:
         result = query.get("result")
         if result:
             try:
-                json.loads(result)
+                parsed_result = json.loads(result)
+                if (
+                    parsed_result.get("dataset_sha256") != dataset.get("data_hash")
+                    or parsed_result.get("version") != dataset.get("version")
+                ):
+                    raise RuntimeError("result dataset binding mismatch")
             except json.JSONDecodeError:
                 result = json.dumps(result)
 

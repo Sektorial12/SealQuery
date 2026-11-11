@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.7 — 2026-11-11
+
+- Bound each aggregate to the registered dataset hash/version before acceptance.
+- Removed the one-shot API event reset after the q37 backfill completed.
+
 ## 0.5.6 — 2026-11-11
 
 - Reset the event checkpoint from the API startup hook so the indexer can
