@@ -17,6 +17,7 @@ from .store import IdempotencyStore, RateLimiter
 settings = get_settings()
 rate_limiter = RateLimiter(settings.rate_limit_per_minute)
 proof_limiter = RateLimiter(max(30, settings.rate_limit_per_minute * 6))
+browser_limiter = RateLimiter(max(10, settings.rate_limit_per_minute * 2))
 idempotency = IdempotencyStore(settings.idempotency_ttl_seconds)
 
 
@@ -41,7 +42,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.5.7",
+    version="0.6.0",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )
@@ -64,7 +65,12 @@ def require_machine_auth(x_api_key: str | None = Header(default=None)) -> None:
 def _identity(request: Request, x_api_key: str | None = None) -> str:
     if x_api_key:
         return f"key:{x_api_key[:8]}"
-    forwarded = request.headers.get("x-forwarded-for", "") if settings.trust_proxy_headers else ""
+    forwarded = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for")
+        if settings.trust_proxy_headers
+        else ""
+    )
     ip = forwarded.split(",")[-1].strip() if forwarded else ""
     if not ip:
         ip = request.client.host if request.client else "unknown"
@@ -153,6 +159,8 @@ def owner_summary(db: Session = Depends(get_db)) -> dict:
 
 @app.post("/api/query", status_code=status.HTTP_202_ACCEPTED)
 def run_query(request: Request, body: dict, db: Session = Depends(get_db)) -> dict:
+    if not browser_limiter.allow("browser"):
+        raise HTTPException(status_code=429, detail="demo browser budget rate limit exceeded")
     if not rate_limiter.allow(_identity(request)):
         raise HTTPException(status_code=429, detail="rate limit exceeded")
     try:

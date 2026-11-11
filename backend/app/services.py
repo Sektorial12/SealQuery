@@ -134,6 +134,66 @@ def _tx_map(db: Session, query_ids: list[int]) -> dict[int, dict]:
     return result
 
 
+def _result_matches_dataset(query: dict, dataset: dict) -> bool:
+    result = query.get("result")
+    if not result:
+        return False
+    try:
+        parsed = json.loads(result)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return (
+        parsed.get("dataset_sha256") == dataset.get("data_hash")
+        and parsed.get("version") == dataset.get("version")
+    )
+
+
+def _event_tx_for_query(db: Session, query_id: int) -> str | None:
+    rows = (
+        db.query(EventRecord)
+        .filter(EventRecord.event == "query_requested")
+        .order_by(EventRecord.block_height.desc())
+        .limit(200)
+        .all()
+    )
+    for row in rows:
+        try:
+            data = json.loads(row.data) if row.data else []
+        except json.JSONDecodeError:
+            continue
+        if data and isinstance(data[0], dict) and int(data[0].get("query_id", -1)) == query_id:
+            return row.tx_hash
+    return None
+
+
+def _recover_query_id(db: Session, job: JobRecord) -> int | None:
+    try:
+        ids = agent_client.rpc_view(
+            settings.contract_account,
+            "get_queries_for_agent",
+            {"agent": settings.agent_account, "limit": 200},
+        )
+    except Exception:
+        return None
+    known = {row[0] for row in db.query(QueryRecord.query_id).all()}
+    candidates = []
+    for query_id in ids:
+        if int(query_id) in known:
+            continue
+        try:
+            query = agent_client.rpc_view(
+                settings.contract_account, "get_query", {"query_id": int(query_id)}
+            )
+        except Exception:
+            continue
+        if (
+            query.get("dataset_id") == job.dataset_id
+            and query.get("computation_id") == job.computation_id
+        ):
+            candidates.append(int(query_id))
+    return max(candidates) if candidates else None
+
+
 def _build_snapshot(db: Session) -> dict:
     with ThreadPoolExecutor(max_workers=16) as pool:
         paused_future = pool.submit(
@@ -611,14 +671,11 @@ def run_job(db: Session, job: JobRecord) -> None:
         result = query.get("result")
         if result:
             try:
-                parsed_result = json.loads(result)
-                if (
-                    parsed_result.get("dataset_sha256") != dataset.get("data_hash")
-                    or parsed_result.get("version") != dataset.get("version")
-                ):
-                    raise RuntimeError("result dataset binding mismatch")
+                json.loads(result)
             except json.JSONDecodeError:
                 result = json.dumps(result)
+            if not _result_matches_dataset(query, dataset):
+                raise RuntimeError("result dataset binding mismatch")
 
         proof = False
         proof_output = ""
@@ -724,9 +781,14 @@ def reconcile_jobs(db: Session) -> int:
     count = 0
     for job in stale:
         if not job.query_id:
-            _job_fail(db, job, "job timed out before a query was submitted")
-            count += 1
-            continue
+            recovered = _recover_query_id(db, job)
+            if recovered is None:
+                _job_fail(db, job, "job timed out before a query was submitted")
+                count += 1
+                continue
+            job.query_id = recovered
+            job.tx_hash = _event_tx_for_query(db, recovered)
+            db.commit()
         try:
             query = agent_client.rpc_view(
                 settings.contract_account, "get_query", {"query_id": job.query_id}
@@ -765,6 +827,15 @@ def reconcile_jobs(db: Session) -> int:
                 except Exception:
                     _job_fail(db, job, "job timed out waiting for OutLayer")
             elif query.get("status") == "ready":
+                dataset = agent_client.rpc_view(
+                    settings.contract_account,
+                    "get_dataset",
+                    {"dataset_id": job.dataset_id},
+                )
+                if not _result_matches_dataset(query, dataset):
+                    _job_fail(db, job, "reconciliation result dataset binding mismatch")
+                    count += 1
+                    continue
                 proof, proof_output = agent_client.verify_attestation(
                     job.tx_hash or "", None
                 )

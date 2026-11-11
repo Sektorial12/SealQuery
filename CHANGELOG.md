@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-11-11
+
+- Added `register_dataset_for` and `transfer_dataset_owner` for real owner onboarding.
+- Made reconciliation recover a crashed job's query from on-chain history and apply
+  the dataset binding check before acceptance.
+- Added a global browser-query rate limit and trusted Cloudflare client identity.
+- Fixed refund timeline labels, settlement labels, and documented upload input,
+  deploy_init, agent funding, and local-vs-hosted load numbers.
+
 ## 0.5.7 — 2026-11-11
 
 - Bound each aggregate to the registered dataset hash/version before acceptance.

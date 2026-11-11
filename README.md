@@ -175,6 +175,15 @@ Expected: `Access control updated`.
 Build `data/upload_input.json` with the CSV and its SHA-256, then run:
 
 ```bash
+jq -n \
+  --rawfile dataset_csv data/retail_v1.csv \
+  --arg version retail_v1 \
+  --arg expected_sha256 "$(sha256sum data/retail_v1.csv | cut -d' ' -f1)" \
+  '{dataset_csv:$dataset_csv,version:$version,expected_sha256:$expected_sha256}' \
+  > data/upload_input.json
+```
+
+```bash
 outlayer-verify run '<deployer>/sealquery-approved' \
   --network testnet \
   --api https://testnet-api.outlayer.ai \
@@ -479,7 +488,7 @@ Highlights:
 - Attestation report: all five checks pass, TCB `UpToDate`; saved bundle verifies offline.
 - Rejected-query path: query 8 failed safely and refunded the agent.
 - Monitoring: `/api/metrics` reported no critical alerts; `monitor.py --once` exited `0`.
-- Load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm.
+- Local load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm (hosted RPC state reads are slower).
 - Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
 - Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
 - Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query, registrations are contract-owner gated, protocol fees freeze after the first query, and late callbacks cannot overwrite final queries.
@@ -508,7 +517,7 @@ Highlights:
 - The cohort is distinct invoices, not distinct people. No differential privacy.
 - Contract state has no migration path yet.
 - Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
-- Dataset registration is contract-owner gated, so multi-tenant onboarding is not permissionless yet.
+- Dataset registration is contract-owner gated. The contract owner can onboard another owner with `register_dataset_for`, but there is no independent owner-proof or permissionless allowlist yet.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 

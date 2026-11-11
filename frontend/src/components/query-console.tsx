@@ -264,11 +264,12 @@ function Timeline({
   jobStatus?: JobResponse["status"];
   submitted: boolean;
 }) {
+  const refunded = Boolean(result?.refund_tx || jobStatus === "refunded");
   const steps = [
     { key: "request", label: "Request submitted" },
     { key: "compute", label: "TEE computation" },
     { key: "verify", label: "Attestation verified" },
-    { key: "settle", label: "Owner settled" },
+    { key: "settle", label: refunded ? "Agent refunded" : "Owner settled" },
   ];
   if (!running && !result && !submitted) return null;
 

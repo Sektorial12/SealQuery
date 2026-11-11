@@ -153,43 +153,45 @@ impl SealQuery {
         budget_per_day: u32,
     ) {
         self.assert_owner();
-        let caller = env::predecessor_account_id();
-        if self.datasets.contains_key(&dataset_id) {
-            env::panic_str("dataset already exists");
-        }
-        validate_version(&version);
-        validate_hash(&data_hash);
-        if allowed_computations.is_empty() {
-            env::panic_str("at least one computation must be allowed");
-        }
-        if reward_yocto.0.saturating_add(compute_deposit_yocto.0) > price_yocto.0 {
-            env::panic_str("reward plus compute deposit must not exceed price");
-        }
-        if budget_per_day == 0 || budget_per_day > MAX_QUERIES_PER_DAY {
-            env::panic_str("budget_per_day must be between 1 and 1000");
-        }
-        self.datasets.insert(
-            dataset_id.clone(),
-            Dataset {
-                owner: caller.clone(),
-                version,
-                data_hash,
-                allowed_computations,
-                price_yocto,
-                compute_deposit_yocto,
-                reward_yocto,
-                budget_per_day,
-            },
+        self.register_dataset_internal(
+            env::predecessor_account_id(),
+            dataset_id,
+            version,
+            data_hash,
+            allowed_computations,
+            price_yocto,
+            compute_deposit_yocto,
+            reward_yocto,
+            budget_per_day,
         );
-        env::log_str(&format!(
-            "EVENT_JSON:{}",
-            json!({
-                "standard": "sealquery",
-                "version": "2.0.0",
-                "event": "dataset_registered",
-                "data": [{"dataset_id": dataset_id, "owner": caller}],
-            })
-        ));
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[payable]
+    pub fn register_dataset_for(
+        &mut self,
+        owner: AccountId,
+        dataset_id: String,
+        version: String,
+        data_hash: String,
+        allowed_computations: Vec<String>,
+        price_yocto: U128,
+        compute_deposit_yocto: U128,
+        reward_yocto: U128,
+        budget_per_day: u32,
+    ) {
+        self.assert_owner();
+        self.register_dataset_internal(
+            owner,
+            dataset_id,
+            version,
+            data_hash,
+            allowed_computations,
+            price_yocto,
+            compute_deposit_yocto,
+            reward_yocto,
+            budget_per_day,
+        );
     }
 
     pub fn remove_dataset(&mut self, dataset_id: String) {
@@ -231,6 +233,25 @@ impl SealQuery {
                 "version": "2.0.0",
                 "event": "budget_reset",
                 "data": [{"agent": agent, "dataset_id": dataset_id}],
+            })
+        ));
+    }
+
+    pub fn transfer_dataset_owner(&mut self, dataset_id: String, new_owner: AccountId) {
+        let caller = env::predecessor_account_id();
+        let mut dataset = self.dataset(&dataset_id);
+        if caller != dataset.owner && caller != self.owner {
+            env::panic_str("only the dataset owner or contract owner can transfer");
+        }
+        dataset.owner = new_owner.clone();
+        self.datasets.insert(dataset_id.clone(), dataset);
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({
+                "standard": "sealquery",
+                "version": "2.0.0",
+                "event": "dataset_owner_transferred",
+                "data": [{"dataset_id": dataset_id, "new_owner": new_owner}],
             })
         ));
     }
@@ -379,9 +400,63 @@ impl SealQuery {
         self.computations.insert(computation_id, computation);
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn register_dataset_internal(
+        &mut self,
+        owner: AccountId,
+        dataset_id: String,
+        version: String,
+        data_hash: String,
+        allowed_computations: Vec<String>,
+        price_yocto: U128,
+        compute_deposit_yocto: U128,
+        reward_yocto: U128,
+        budget_per_day: u32,
+    ) {
+        if self.datasets.contains_key(&dataset_id) {
+            env::panic_str("dataset already exists");
+        }
+        validate_version(&version);
+        validate_hash(&data_hash);
+        if allowed_computations.is_empty() {
+            env::panic_str("at least one computation must be allowed");
+        }
+        if reward_yocto.0.saturating_add(compute_deposit_yocto.0) > price_yocto.0 {
+            env::panic_str("reward plus compute deposit must not exceed price");
+        }
+        if budget_per_day == 0 || budget_per_day > MAX_QUERIES_PER_DAY {
+            env::panic_str("budget_per_day must be between 1 and 1000");
+        }
+        self.datasets.insert(
+            dataset_id.clone(),
+            Dataset {
+                owner: owner.clone(),
+                version,
+                data_hash,
+                allowed_computations,
+                price_yocto,
+                compute_deposit_yocto,
+                reward_yocto,
+                budget_per_day,
+            },
+        );
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({
+                "standard": "sealquery",
+                "version": "2.0.0",
+                "event": "dataset_registered",
+                "data": [{"dataset_id": dataset_id, "owner": owner}],
+            })
+        ));
+    }
+
     pub fn quote(&self, dataset_id: String, computation_id: String) -> Value {
         let dataset = self.dataset(&dataset_id);
         let computation = self.computation(&computation_id);
+        if computation.dataset_id != dataset_id {
+            env::panic_str("computation does not belong to dataset");
+        }
         json!({
             "dataset_id": dataset_id,
             "computation_id": computation_id,
@@ -1243,7 +1318,61 @@ mod tests {
     }
 
     #[test]
+    fn contract_owner_can_register_for_another_owner() {
+        let (mut contract, _owner) = setup();
+        let second = account("owner2.testnet");
+        contract.register_dataset_for(
+            second.clone(),
+            "retail_v2".to_string(),
+            "retail_v2".to_string(),
+            DATA_HASH.to_string(),
+            vec!["spend_growth".to_string()],
+            U128(20_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            U128(10_000_000_000_000_000_000_000),
+            20,
+        );
+        assert_eq!(contract.get_dataset("retail_v2".to_string()).owner, second);
+    }
+
+    #[test]
+    fn owner_can_transfer_dataset_ownership() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner)
+            .build());
+        contract.transfer_dataset_owner("retail_v1".to_string(), account("owner2.testnet"));
+        assert_eq!(
+            contract.get_dataset("retail_v1".to_string()).owner,
+            account("owner2.testnet")
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "only the dataset owner or contract owner can transfer")]
+    fn rejects_owner_transfer_from_attacker() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(account("attacker.testnet"))
+            .build());
+        contract.transfer_dataset_owner("retail_v1".to_string(), account("attacker.testnet"));
+    }
+
+    #[test]
+    fn quote_rejects_mismatched_computation() {
+        let (mut contract, owner) = setup();
+        register_dataset(&mut contract, &owner);
+        register_computation(&mut contract, &owner);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.quote("retail_v1".to_string(), "missing".to_string())
+        }));
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn version_is_exposed() {
-        assert_eq!(SealQuery::version(), "0.2.2");
+        assert_eq!(SealQuery::version(), "0.2.3");
     }
 }

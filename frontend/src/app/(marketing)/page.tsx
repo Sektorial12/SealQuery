@@ -68,7 +68,7 @@ export default function HomePage() {
                 <ReceiptRow label="Settlement" value="owner paid on acceptance" />
               </div>
               <div className="mt-4 rounded-xl border border-line bg-[#080c10] p-3">
-                <div className="flex items-center justify-between text-[10px] text-faint"><span>Verification layers</span><span>5 / 5</span></div>
+                <div className="flex items-center justify-between text-[10px] text-faint"><span>Verification layers</span><span>5 checks</span></div>
                 <div className="mt-2 grid gap-1.5">
                   {["authenticity", "identity", "binding", "input", "output"].map((name) => (
                     <div key={name} className="flex items-center justify-between text-[10px]">

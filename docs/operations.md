@@ -57,7 +57,7 @@ alerts. Alerts:
 |---|---|---|
 | `contract_paused` | critical | New queries are rejected. |
 | `dataset_unavailable` | critical | A contract view or dataset lookup failed. |
-| `low_agent_balance` | critical | Agent below 0.1 NEAR. |
+| `low_agent_balance` | critical | Agent below 0.3 NEAR. |
 | `low_contract_balance` | warning | Contract below 0.5 NEAR. |
 | `budget_exhausted` | warning | A per-agent/per-dataset daily budget is used up. |
 | `recent_failed_queries` | warning | At least one recent query failed. |
@@ -73,8 +73,9 @@ python3 scripts/load_test.py --requests 10 --concurrency 3
 ```
 
 The state endpoint has a 15-second cache (`SEALQUERY_STATE_TTL_SECONDS`) and falls back to the last successful snapshot during transient RPC failures. The
-2026-11-09 run with 6 requests and concurrency 3 returned 0 errors and p95
-`54.9 ms` warm. A cold state read was `4.15 s`; RPC-backed reads are cached
+The local 2026-11-09 run with 6 requests and concurrency 3 returned 0 errors
+and p95 `54.9 ms` warm. Hosted runs are slower. A cold state read was `4.15 s`;
+RPC-backed reads are cached
 briefly to avoid public-RPC rate limits. The agent RPC client limits concurrent
 calls with `NEAR_RPC_CONCURRENCY` (default `3`) and retries `429`/`5xx`.
 
