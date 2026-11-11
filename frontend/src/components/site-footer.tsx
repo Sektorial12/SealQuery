@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 export function SiteFooter() {
   return (
@@ -6,9 +7,7 @@ export function SiteFooter() {
       <div className="mx-auto grid w-full max-w-[1240px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.2fr_2fr]">
         <div>
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-accent to-accent-2 text-sm font-extrabold text-[#06110d]">
-              SQ
-            </span>
+            <BrandMark />
             <span className="text-sm font-bold">SealQuery</span>
           </div>
           <p className="mt-4 max-w-sm text-xs leading-6 text-muted">

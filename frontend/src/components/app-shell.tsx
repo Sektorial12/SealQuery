@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
 import { api } from "@/lib/api";
 import { short } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -46,9 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex w-full max-w-[1560px]">
         <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 border-r border-line px-4 py-5 lg:flex lg:flex-col">
           <Link href="/" className="flex items-center gap-3 px-2">
-            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-accent to-accent-2 text-sm font-extrabold text-[#06110d]">
-              SQ
-            </span>
+            <BrandMark />
             <span className="leading-tight">
               <span className="block text-sm font-bold">SealQuery</span>
               <span className="block text-[10px] uppercase tracking-[0.16em] text-faint">Testnet app</span>
@@ -93,8 +92,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <header className="sticky top-0 z-30 border-b border-line bg-background/85 backdrop-blur-xl">
             <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
-                <Link href="/" className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-accent to-accent-2 text-sm font-extrabold text-[#06110d] lg:hidden">
-                  SQ
+                <Link href="/" aria-label="SealQuery home" className="lg:hidden">
+                  <BrandMark />
                 </Link>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">Agent workspace</p>

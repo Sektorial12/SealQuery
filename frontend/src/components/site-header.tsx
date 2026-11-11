@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -24,9 +25,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between gap-4 px-5 sm:px-8">
         <Link href="/" className="flex items-center gap-3">
-          <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-accent to-accent-2 text-sm font-extrabold text-[#06110d]">
-            SQ
-          </span>
+          <BrandMark />
           <span className="leading-tight">
             <span className="block text-sm font-bold tracking-[-0.02em]">SealQuery</span>
             <span className="hidden text-[11px] text-muted sm:block">Private data compute for AI agents</span>

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/sealquery-banner.webp" alt="SealQuery — sell the answer, not the dataset" width="100%" />
+</p>
+
 # SealQuery
 
 SealQuery lets AI agents pay to execute approved computations against privately held datasets without receiving the raw data.
