@@ -49,7 +49,9 @@ export default function SecurityPage() {
               A successful query produces an OutLayer task and a TDX report. The agent runs
               <code className="mx-1 rounded bg-panel-2 px-1.5 py-0.5 font-mono text-xs text-accent">outlayer-verify</code>
               before calling <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-xs text-accent">accept_result</code>.
-              Payment is not released on an unverified result.
+              On the happy path the agent verifies before settlement. If the agent does not
+              act, anyone may settle a ready query to the owner after the 200-block timeout;
+              that timeout path is not proof-gated on-chain.
             </p>
             <p>
               The proof bundle can be downloaded and checked offline. Verification includes the Intel signature chain,
@@ -57,7 +59,8 @@ export default function SecurityPage() {
             </p>
             <p className="rounded-xl border border-warning/25 bg-warning/[0.05] p-3 text-xs text-warning">
               The TEE proves which code ran on which input and output. It does not prove the computation is semantically
-              correct, and the contract does not verify TDX quotes on-chain.
+              correct, and the contract does not verify TDX quotes on-chain. Verification is
+              enforced by the off-chain agent client, not by the contract.
             </p>
           </div>
           <div className="code-block">

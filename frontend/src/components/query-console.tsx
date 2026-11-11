@@ -40,9 +40,10 @@ export function QueryConsole() {
   });
 
   const terminal = job ? terminalStatuses.includes(job.status) : false;
+  const submitted = Boolean(job?.query_id || job?.tx_hash);
   const result = useMemo<QueryRunResponse | null>(
-    () => (job && terminal ? jobToResult(job) : null),
-    [job, terminal],
+    () => (job && terminal && submitted ? jobToResult(job) : null),
+    [job, terminal, submitted],
   );
   const rows = useMemo<AggregateRow[]>(() => {
     const parsed = result ? parseResult(result.result) : null;
@@ -198,7 +199,10 @@ export function QueryConsole() {
 
         {job?.status === "error" ? (
           <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
-            {job.error || "The query worker reported an error."}
+            {job.query_id
+              ? job.error || "The query worker reported an error after submission."
+              : "No transaction was submitted. No funds moved. Retry after the worker recovers."}
+            {job.error ? <span className="mt-1 block font-mono text-[10px] text-danger/80">{job.error}</span> : null}
           </div>
         ) : null}
 
@@ -208,7 +212,7 @@ export function QueryConsole() {
           </p>
         ) : null}
 
-        <Timeline running={running} result={result} jobStatus={job?.status} />
+        <Timeline running={running} result={result} jobStatus={job?.status} submitted={submitted} />
 
         {result ? <Result result={result} rows={rows} rejected={rejected} /> : null}
       </div>
@@ -253,10 +257,12 @@ function Timeline({
   running,
   result,
   jobStatus,
+  submitted,
 }: {
   running: boolean;
   result: QueryRunResponse | null;
   jobStatus?: JobResponse["status"];
+  submitted: boolean;
 }) {
   const steps = [
     { key: "request", label: "Request submitted" },
@@ -264,13 +270,14 @@ function Timeline({
     { key: "verify", label: "Attestation verified" },
     { key: "settle", label: "Owner settled" },
   ];
-  if (!running && !result) return null;
+  if (!running && !result && !submitted) return null;
 
   const done = {
-    request: Boolean((jobStatus && jobStatus !== "queued") || result),
+    request: submitted,
     compute: Boolean(
-      result && result.status !== "failed" ||
-        (jobStatus && ["ready", "settled", "refunded", "failed", "error"].includes(jobStatus)),
+      submitted &&
+        ((result && result.status !== "failed") ||
+          (jobStatus && ["ready", "settled", "refunded", "failed", "error"].includes(jobStatus))),
     ),
     verify: Boolean(result?.proof || jobStatus === "settled"),
     settle: Boolean(
@@ -321,7 +328,11 @@ function Result({
   rows: AggregateRow[];
   rejected: boolean;
 }) {
-  const badge = result.proof ? "PROVEN" : rejected ? "REJECTED · REFUNDED" : "NOT PROVEN";
+  const badge = result.proof
+    ? "PROVEN"
+    : result.refund_tx
+      ? "REJECTED · REFUNDED"
+      : "NOT PROVEN";
   const parsed = parseResult(result.result);
 
   return (
@@ -338,7 +349,9 @@ function Result({
 
       {rejected ? (
         <div className="mt-4 rounded-xl border border-warning/25 bg-warning/[0.06] p-4 text-xs leading-6 text-warning">
-          The workload rejected the request. No aggregate was released, and the agent was refunded.
+          {result.refund_tx
+            ? "The workload rejected the request. No aggregate was released, and the agent was refunded."
+            : "The result was not proven. No aggregate was accepted, and no refund was issued for this ready query."}
         </div>
       ) : rows.length ? (
         <>

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1 — 2026-11-11
+
+- Added sanitized near CLI diagnostics and explicit key-file checks.
+- Distinguished no-transaction, refunded, and unproven-result UI states.
+- Corrected the security page and MCP guidance to disclose timeout settlement.
+- Installed rustfmt/clippy explicitly in CI.
+
 ## 0.5.0 — 2026-11-10
 
 - Blocked refunds of ready results; added permissionless owner settlement after timeout.

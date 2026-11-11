@@ -57,8 +57,22 @@ def _tx_failure(tx_hash: str, signer: str) -> str:
         return "transaction failed"
 
 
-def _raise_failure(tx_hash: str | None, signer: str) -> None:
-    detail = _tx_failure(tx_hash, signer) if tx_hash else "near CLI error"
+def _cli_detail(output: str) -> str:
+    text = _ANSI_RE.sub("", output)
+    text = re.sub(r"ed25519:[1-9A-HJ-NP-Za-km-z]+", "[redacted]", text)
+    lines = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        lowered = line.lower()
+        if any(token in lowered for token in ("error", "fail", "not found", "missing", "unable", "denied", "no such")):
+            lines.append(line[:300])
+    return " | ".join(lines[-3:]) if lines else "near CLI error"
+
+
+def _raise_failure(tx_hash: str | None, signer: str, output: str = "") -> None:
+    detail = _tx_failure(tx_hash, signer) if tx_hash else _cli_detail(output)
     raise RuntimeError(f"near transaction failed: {detail}")
 
 
@@ -133,7 +147,7 @@ def near_call(contract: str, method: str, args: dict, agent: str, deposit: str) 
     output = completed.stdout + completed.stderr
     match = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
     if completed.returncode != 0:
-        _raise_failure(match.group(1) if match else None, agent)
+        _raise_failure(match.group(1) if match else None, agent, output)
     if not match:
         raise RuntimeError("transaction id not found in near CLI output")
     return match.group(1)
@@ -147,6 +161,8 @@ def parse_query_id(output: str) -> int:
 
 
 def request_query(contract: str, agent: str, dataset: str, computation: str, params: dict) -> tuple[int, str]:
+    if NEAR_ACCESS_KEY_FILE and not os.path.exists(NEAR_ACCESS_KEY_FILE):
+        raise RuntimeError(f"access key file not found: {NEAR_ACCESS_KEY_FILE}")
     quote = rpc_view(contract, "quote", {"dataset_id": dataset, "computation_id": computation})
     price_yocto = int(quote["price_yocto"])
     deposit = f"{price_yocto / 1e24:.6f} NEAR"
@@ -184,7 +200,7 @@ def request_query(contract: str, agent: str, dataset: str, computation: str, par
     output = completed.stdout + completed.stderr
     tx_hash = re.search(r"Transaction ID:\s*([1-9A-HJ-NP-Za-km-z]+)", output)
     if completed.returncode != 0:
-        _raise_failure(tx_hash.group(1) if tx_hash else None, agent)
+        _raise_failure(tx_hash.group(1) if tx_hash else None, agent, output)
     if not tx_hash:
         raise RuntimeError("transaction id not found in near CLI output")
     return parse_query_id(output), tx_hash.group(1)

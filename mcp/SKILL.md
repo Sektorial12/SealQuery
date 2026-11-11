@@ -32,5 +32,5 @@ and `owner_after`. It never returns raw dataset rows.
 - `daily privacy budget exceeded`: wait for the next UTC day or use another
   approved dataset.
 - `contract is paused`: the data owner or contract owner must unpause.
-- `not proven`: do not accept the result; the agent client refunds the query.
+- `not proven`: do not call `accept_result`. A ready query cannot be refunded; the owner may claim it through timeout settlement after 200 blocks. This is a known limitation.
 - `unauthorized`: send the configured `X-API-Key`.
