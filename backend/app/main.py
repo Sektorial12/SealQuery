@@ -30,12 +30,18 @@ async def lifespan(_: FastAPI):
             services.sync_queries(db)
         finally:
             db.close()
+    if settings.event_reindex and settings.event_start_block:
+        db = SessionLocal()
+        try:
+            services.reset_event_checkpoint(db, settings.event_start_block)
+        finally:
+            db.close()
     yield
 
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.5.5",
+    version="0.5.6",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )

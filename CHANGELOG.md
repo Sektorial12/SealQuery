@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.6 — 2026-11-11
+
+- Reset the event checkpoint from the API startup hook so the indexer can
+  backfill the q37 request/settlement links.
+
 ## 0.5.5 — 2026-11-11
 
 - Reindexed recent contract events from the q37 backfill block and disabled

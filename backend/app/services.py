@@ -913,6 +913,18 @@ def _apply_event(
         query.updated_at = utcnow()
 
 
+def reset_event_checkpoint(db: Session, start_block: int | None = None) -> None:
+    checkpoint = db.get(IndexerCheckpoint, "events")
+    if checkpoint is None:
+        db.add(IndexerCheckpoint(name="events", last_block=max(0, (start_block or 1) - 1)))
+    else:
+        checkpoint.last_block = max(0, (start_block or 1) - 1)
+        checkpoint.updated_at = utcnow()
+    db.commit()
+    global _event_reindexed
+    _event_reindexed = True
+
+
 def sync_events(db: Session) -> int:
     """Index NEP-297 events forward from a saved Neardata checkpoint."""
     global _event_reindexed
