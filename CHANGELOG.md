@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4 — 2026-11-11
+
+- Fixed the missing event-indexer lag setting that stopped the indexer heartbeat.
+
 ## 0.5.3 — 2026-11-11
 
 - Added proof-endpoint rate limiting, an indexer error heartbeat, sitemap output,

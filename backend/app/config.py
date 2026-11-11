@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     event_blocks_per_sync: int = Field(
         default=100, validation_alias=AliasChoices("EVENT_BLOCKS_PER_SYNC", "SEALQUERY_EVENT_BLOCKS_PER_SYNC")
     )
+    event_max_lag_blocks: int = Field(
+        default=1_000, validation_alias=AliasChoices("EVENT_MAX_LAG_BLOCKS", "SEALQUERY_EVENT_MAX_LAG_BLOCKS")
+    )
     event_indexer_interval_seconds: float = Field(
         default=5.0, validation_alias=AliasChoices("EVENT_INDEXER_INTERVAL_SECONDS", "SEALQUERY_EVENT_INDEXER_INTERVAL_SECONDS")
     )
