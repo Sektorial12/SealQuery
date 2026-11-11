@@ -498,6 +498,7 @@ Highlights:
 - Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
 - Hosted async query `38` after funding the demo agent: task `47539`, `PROVEN`, settled.
 - Hosted async query `39` after output-binding checks: task `48761`, `PROVEN`, settled.
+- Hosted async query `42` after the v0.2.3/0.6.0 deploy: task `51098`, `PROVEN`, settled; the demo browser limiter returned 429 after the quota.
 - Live ready-result regression: query `37` was left ready; `refund_query` was rejected with `ready query must be settled, not refunded`, then `settle_query` paid the owner after timeout.
 - Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
 

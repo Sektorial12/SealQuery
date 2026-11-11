@@ -230,6 +230,11 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Hosted query `39` after output binding and funding: task `48761`, `PROVEN`,
   settled; request `GvJGipmmHzY2Ty2AwEWZAjZhb6aZWDqYfKFu1td3tqih`, accept
   `EbWc19Wr3N3vqWrrhrbaAkgYHJrrqL3XQbdZUSjWCwck`.
+- Hosted query `42` after the v0.2.3 contract and 0.6.0 API deploy: task `51098`,
+  `PROVEN`, settled; request `9JnRdf1kUBLKQ4XHS8mrM6AhzyWt3vriayMQ7oAxN3ps`,
+  accept `9XGpTUv25bdQr8rWtjoRCkXmsD6RKV6f8eLcWwSeVxyh`.
+- Browser rate-limit check: 12 rapid constant-XFF invalid requests returned 400
+  for the first five and 429 for the rest.
 - Ready-result regression on the live v0.2.2 contract: query `37` request
   `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`; after the callback set it
   `ready`, `refund_query` was rejected with
@@ -237,8 +242,10 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - After the 200-block timeout, permissionless `settle_query` paid the owner:
   transaction `2nVhVTfXKcUuhbxsZa1HaMcEyAm8viBcjzXuDYWmc4Wo`; query `37` is
   `settled`.
-- Live v0.2.2 state after cleanup: `list_datasets` = `["retail_v1"]`, budget
-  `2/20`, `paused=false`.
+- Live v0.2.2 state after cleanup (historical): `list_datasets` = `["retail_v1"]`,
+  budget `2/20`, `paused=false`.
+- Live v0.2.3 state after query `42`: `list_datasets` = `["retail_v1"]`, budget
+  `5/20`, `paused=false`, 42 queries.
 - Post-upgrade async incident drill on v0.5.0 API: job
   `a8929f45227d461ca71d469b3d712deb` failed fast with `contract is paused`;
   pause/unpause finished with `DRILL PASSED`.
