@@ -134,6 +134,35 @@ def _tx_map(db: Session, query_ids: list[int]) -> dict[int, dict]:
     return result
 
 
+def _verify_with_retries(tx_hash: str) -> tuple[bool, str]:
+    last: tuple[bool, str] = (False, "")
+    for attempt in range(3):
+        last = agent_client.verify_attestation(tx_hash, None)
+        if last[0]:
+            return last
+        if attempt < 2:
+            time.sleep(1 + attempt)
+    return last
+
+
+def _accept_with_retries(query_id: int) -> str:
+    last: Exception | None = None
+    for attempt in range(3):
+        try:
+            return agent_client.near_call(
+                settings.contract_account,
+                "accept_result",
+                {"query_id": query_id},
+                settings.agent_account,
+                "0 NEAR",
+            )
+        except Exception as error:
+            last = error
+            if attempt < 2:
+                time.sleep(1 + attempt)
+    raise RuntimeError(f"accept_result failed after retries: {last}")
+
+
 def _result_matches_dataset(query: dict, dataset: dict) -> bool:
     result = query.get("result")
     if not result:
@@ -682,15 +711,9 @@ def run_job(db: Session, job: JobRecord) -> None:
         accept_tx = None
         refund_tx = None
         if query["status"] == "ready":
-            proof, proof_output = agent_client.verify_attestation(tx_hash, None)
+            proof, proof_output = _verify_with_retries(tx_hash)
             if proof:
-                accept_tx = agent_client.near_call(
-                    settings.contract_account,
-                    "accept_result",
-                    {"query_id": query_id},
-                    settings.agent_account,
-                    "0 NEAR",
-                )
+                accept_tx = _accept_with_retries(query_id)
             else:
                 job.status = "failed"
                 job.error = "attestation did not verify"
@@ -836,17 +859,9 @@ def reconcile_jobs(db: Session) -> int:
                     _job_fail(db, job, "reconciliation result dataset binding mismatch")
                     count += 1
                     continue
-                proof, proof_output = agent_client.verify_attestation(
-                    job.tx_hash or "", None
-                )
+                proof, proof_output = _verify_with_retries(job.tx_hash or "")
                 if proof:
-                    job.accept_tx = agent_client.near_call(
-                        settings.contract_account,
-                        "accept_result",
-                        {"query_id": job.query_id},
-                        settings.agent_account,
-                        "0 NEAR",
-                    )
+                    job.accept_tx = _accept_with_retries(job.query_id)
                     job.status = "settled"
                     job.proof = True
                     job.proof_output = proof_output

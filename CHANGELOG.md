@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 — 2026-11-11
+
+- Retried transient attestation verification and acceptance calls.
+
 ## 0.6.0 — 2026-11-11
 
 - Added `register_dataset_for` and `transfer_dataset_owner` for real owner onboarding.
