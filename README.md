@@ -96,17 +96,17 @@ Expected: `5 passed`.
 
 ### Reproducible build
 
-The deployed artifact was built from commit `90e382d`. Check out that commit
+The deployed artifact was built from commit `052611e`. Check out that commit
 first for a bit-identical hash; later commits change only the embedded source
 snapshot metadata.
 
 ```bash
-git checkout 90e382d
+git checkout 052611e
 cd contracts/sealquery
 cargo near build reproducible-wasm
 ```
 
-Expected v0.2.2 contract hash: `6749f0bab47ffa6bdc1aaeb9a54fc9eeb8b84f5c2e58f5a0fa4c4902fe5e146c`, built from commit `90e382d`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
+Expected v0.2.3 contract hash: `76570dc47a7bee9f5586a455efa7fdfbb71b67ac980972694dc9bd2dbcdb5729`, built from commit `052611e`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 
@@ -491,7 +491,8 @@ Highlights:
 - Local load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm (hosted RPC state reads are slower).
 - Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
 - Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
-- Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query, registrations are contract-owner gated, protocol fees freeze after the first query, and late callbacks cannot overwrite final queries.
+- Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query; protocol fees freeze after the first query; late callbacks cannot overwrite final queries.
+- v0.2.3 adds contract-owner onboarding with `register_dataset_for` and `transfer_dataset_owner`; a live `onboard_test` dataset was registered for a second owner and removed.
 - Hosted async query `32` after the first contract upgrade: task `41071`, `PROVEN`, settled.
 - The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset, and its budget was reset for judging.
 - Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
@@ -517,7 +518,7 @@ Highlights:
 - The cohort is distinct invoices, not distinct people. No differential privacy.
 - Contract state has no migration path yet.
 - Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
-- Dataset registration is contract-owner gated. The contract owner can onboard another owner with `register_dataset_for`, but there is no independent owner-proof or permissionless allowlist yet.
+- Dataset registration is contract-owner gated. The contract owner can onboard another owner with `register_dataset_for`, but there is no independent owner-proof or permissionless allowlist yet. A live onboarding/removal test used `onboard_test`.
 - Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
 - The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
 

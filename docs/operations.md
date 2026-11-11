@@ -29,8 +29,10 @@ near contract call-function as-transaction "$CONTRACT_ACCOUNT" reset_budget \
   sign-as "$OWNER_ACCOUNT" network-config testnet sign-with-keychain send
 ```
 
-Dataset registration is contract-owner gated. This is intentionally stricter
-than a permissionless marketplace until owner-proof binding is implemented.
+Dataset registration is contract-owner gated. The contract owner can onboard a
+different owner with `register_dataset_for`, and the dataset owner or contract
+owner can transfer ownership. This is intentionally stricter than a
+permissionless marketplace until owner-proof binding is implemented.
 
 ## Agent funding
 
