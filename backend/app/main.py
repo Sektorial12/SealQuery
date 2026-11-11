@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="SealQuery API",
-    version="0.5.1",
+    version="0.5.2",
     description="Private data compute for AI agents on NEAR testnet.",
     lifespan=lifespan,
 )
@@ -58,7 +58,7 @@ def _identity(request: Request, x_api_key: str | None = None) -> str:
     if x_api_key:
         return f"key:{x_api_key[:8]}"
     forwarded = request.headers.get("x-forwarded-for", "") if settings.trust_proxy_headers else ""
-    ip = forwarded.split(",")[0].strip() if forwarded else ""
+    ip = forwarded.split(",")[-1].strip() if forwarded else ""
     if not ip:
         ip = request.client.host if request.client else "unknown"
     return f"ip:{ip}"
@@ -169,17 +169,23 @@ def run_machine_query(
         raise HTTPException(status_code=429, detail="rate limit exceeded")
     if idempotency_key:
         cached = idempotency.get(idempotency_key)
-        if cached is not None:
+        if cached is not None and not cached.get("_pending"):
             return JSONResponse(
                 content=cached,
                 status_code=200,
                 headers={"X-Idempotent-Replay": "true"},
             )
+        if not idempotency.claim(idempotency_key):
+            raise HTTPException(status_code=409, detail="idempotent request in progress")
     try:
         result = services.enqueue_job(db, body)
     except ValueError as error:
+        if idempotency_key:
+            idempotency.release(idempotency_key)
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
+        if idempotency_key:
+            idempotency.release(idempotency_key)
         raise HTTPException(status_code=500, detail=str(error)) from error
     if idempotency_key and result.get("ok"):
         idempotency.set(idempotency_key, result)

@@ -81,6 +81,37 @@ class IdempotencyStore:
             self._memory.pop(key, None)
             return None
 
+    def claim(self, key: str) -> bool:
+        if self._redis is not None:
+            try:
+                return bool(
+                    self._redis.set(
+                        f"sealquery:idem-lock:{key}",
+                        "1",
+                        nx=True,
+                        ex=30,
+                    )
+                )
+            except Exception:
+                pass
+        with self._lock:
+            cached = self._memory.get(key)
+            if cached and time.time() - cached[0] < self.ttl:
+                return False
+            self._memory[key] = (time.time(), {"_pending": True})
+            return True
+
+    def release(self, key: str) -> None:
+        if self._redis is not None:
+            try:
+                self._redis.delete(f"sealquery:idem-lock:{key}")
+            except Exception:
+                pass
+        with self._lock:
+            cached = self._memory.get(key)
+            if cached and cached[1].get("_pending"):
+                self._memory.pop(key, None)
+
     def set(self, key: str, value: dict) -> None:
         if self._redis is not None:
             try:

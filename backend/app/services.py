@@ -300,12 +300,28 @@ def metrics(db: Session) -> dict:
             }
         )
 
-    if agent_balance is not None and int(agent_balance) < 100_000_000_000_000_000_000_000:
+    if agent_balance is not None and int(agent_balance) < 300_000_000_000_000_000_000_000:
         alerts.append(
             {
                 "severity": "critical",
                 "code": "low_agent_balance",
-                "message": f"Agent balance below 0.1 NEAR: {agent_balance} yoctoNEAR.",
+                "message": f"Agent balance below 0.3 NEAR: {agent_balance} yoctoNEAR.",
+            }
+        )
+    recent_errors = (
+        db.query(JobRecord)
+        .filter(
+            JobRecord.status == "error",
+            JobRecord.updated_at >= utcnow() - timedelta(hours=1),
+        )
+        .count()
+    )
+    if recent_errors:
+        alerts.append(
+            {
+                "severity": "critical",
+                "code": "recent_job_errors",
+                "message": f"{recent_errors} job error(s) in the last hour.",
             }
         )
     if contract_balance is not None and int(contract_balance) < 500_000_000_000_000_000_000_000:
@@ -567,6 +583,9 @@ def run_job(db: Session, job: JobRecord) -> None:
             raise ValueError("dataset/computation is not in the configured demo allowlist")
         if agent_client.rpc_view(settings.contract_account, "get_paused", {}):
             raise RuntimeError("contract is paused")
+        balance = account_balance(settings.agent_account)
+        if balance is not None and int(balance) < 300_000_000_000_000_000_000_000:
+            raise RuntimeError("agent balance below 0.3 NEAR; fund the demo agent")
         dataset = agent_client.rpc_view(
             settings.contract_account, "get_dataset", {"dataset_id": job.dataset_id}
         )
@@ -914,8 +933,16 @@ def sync_events(db: Session) -> int:
             if checkpoint is None:
                 raise
 
+    if settings.event_start_block is not None and checkpoint.last_block < settings.event_start_block:
+        checkpoint.last_block = max(0, settings.event_start_block - 1)
+        checkpoint.updated_at = utcnow()
+        db.commit()
     if checkpoint.last_block >= latest:
         return 0
+    if latest - checkpoint.last_block > settings.event_max_lag_blocks:
+        checkpoint.last_block = max(0, latest - settings.event_max_lag_blocks)
+        checkpoint.updated_at = utcnow()
+        db.commit()
 
     end = min(latest, checkpoint.last_block + settings.event_blocks_per_sync)
     processed = 0

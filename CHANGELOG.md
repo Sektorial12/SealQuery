@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — 2026-11-11
+
+- Made idempotency reservation atomic and rate-limit identity use the trusted proxy hop.
+- Added critical job-error and low-balance alerts, plus an agent balance preflight.
+- Fast-forwarded the event indexer and added a testnet backfill start block.
+- Funded the demo agent after the balance fell below the gas-plus-deposit requirement.
+
 ## 0.5.1 — 2026-11-11
 
 - Added sanitized near CLI diagnostics and explicit key-file checks.
