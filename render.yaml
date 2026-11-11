@@ -82,9 +82,11 @@ services:
       - key: EVENT_START_BLOCK
         value: "277135250"
       - key: EVENT_BLOCKS_PER_SYNC
-        value: "50"
+        value: "100"
       - key: EVENT_MAX_LAG_BLOCKS
-        value: "5000"
+        value: "10000"
+      - key: EVENT_REINDEX
+        value: "1"
       - key: PROOF_DIR
         value: data/proofs
 

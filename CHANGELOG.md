@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.5 — 2026-11-11
+
+- Reindexed recent contract events from the q37 backfill block and disabled
+  fast-forward when an explicit start block is configured.
+
 ## 0.5.4 — 2026-11-11
 
 - Fixed the missing event-indexer lag setting that stopped the indexer heartbeat.

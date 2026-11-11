@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     event_max_lag_blocks: int = Field(
         default=1_000, validation_alias=AliasChoices("EVENT_MAX_LAG_BLOCKS", "SEALQUERY_EVENT_MAX_LAG_BLOCKS")
     )
+    event_reindex: bool = Field(
+        default=False, validation_alias=AliasChoices("EVENT_REINDEX", "SEALQUERY_EVENT_REINDEX")
+    )
     event_indexer_interval_seconds: float = Field(
         default=5.0, validation_alias=AliasChoices("EVENT_INDEXER_INTERVAL_SECONDS", "SEALQUERY_EVENT_INDEXER_INTERVAL_SECONDS")
     )

@@ -48,6 +48,7 @@ DEFAULT_PARAMS = {
 _snapshot_lock = threading.Lock()
 _cache_lock = threading.Lock()
 _snapshot_cache: tuple[float, dict | None] = (0.0, None)
+_event_reindexed = False
 
 
 def _path(value: str) -> Path:
@@ -914,6 +915,7 @@ def _apply_event(
 
 def sync_events(db: Session) -> int:
     """Index NEP-297 events forward from a saved Neardata checkpoint."""
+    global _event_reindexed
     base = settings.neardata_api.rstrip("/")
     latest_payload = _neardata_get("/v0/last_block/final")
     if not latest_payload:
@@ -933,13 +935,17 @@ def sync_events(db: Session) -> int:
             if checkpoint is None:
                 raise
 
-    if settings.event_start_block is not None and checkpoint.last_block < settings.event_start_block:
+    if settings.event_start_block is not None and (
+        checkpoint.last_block < settings.event_start_block
+        or (settings.event_reindex and not _event_reindexed)
+    ):
         checkpoint.last_block = max(0, settings.event_start_block - 1)
         checkpoint.updated_at = utcnow()
         db.commit()
+        _event_reindexed = True
     if checkpoint.last_block >= latest:
         return 0
-    if latest - checkpoint.last_block > settings.event_max_lag_blocks:
+    if settings.event_start_block is None and latest - checkpoint.last_block > settings.event_max_lag_blocks:
         checkpoint.last_block = max(0, latest - settings.event_max_lag_blocks)
         checkpoint.updated_at = utcnow()
         db.commit()
