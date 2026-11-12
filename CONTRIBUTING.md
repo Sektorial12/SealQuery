@@ -14,7 +14,7 @@ dataset delivery to agents.
 - `frontend/` — Next.js product app
 - `mcp/` — MCP stdio server
 - `scripts/` — dataset, deploy, verification, monitoring, demo tools
-- `docs/` — evidence, operations, threat model, architecture
+- `docs/` — evidence, operations, threat model, architecture, brand assets
 
 ## Development checks
 
@@ -67,6 +67,8 @@ rewrite public history without approval.
 
 - Keep changes focused and explain the capability, not a planning phase.
 - Include tests or evidence for behavior changes.
+- Keep `README.md`, `docs/`, `SECURITY.md`, and `CHANGELOG.md` consistent with the
+  deployed contract/API versions and current limitations.
 - Update `docs/evidence.md` for new on-chain or attestation evidence.
 - Update the README when a public command, endpoint, or deployment surface changes.
 - Confirm `./scripts/check_secrets.sh` and `git diff --check` pass.

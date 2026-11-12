@@ -35,3 +35,6 @@ pnpm build
 ```
 
 The canonical deployment is `compose.yaml` at the repository root.
+
+Brand assets live in `src/assets/` and `src/app/icon.png`; do not replace the
+header mark with a generated or transparent-redrawn logo.

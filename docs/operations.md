@@ -6,7 +6,8 @@ current demo.
 
 ## Service surface
 
-- **Contract:** `contract.sealquery-v2-1794194344.testnet`
+- **Contract:** `contract.sealquery-v2-1794194344.testnet` (`0.2.3`)
+- **API:** `0.6.2`
 - **Agent:** `agent2.sealquery-1794187176.testnet`
 - **FastAPI:** `http://127.0.0.1:8000`
 - **Next.js app:** `http://127.0.0.1:3000`
@@ -25,6 +26,15 @@ open queries:
 ```bash
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" reset_budget \
   json-args '{"agent":"agent2.sealquery-1794187176.testnet","dataset_id":"retail_v1"}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' \
+  sign-as "$OWNER_ACCOUNT" network-config testnet sign-with-keychain send
+```
+
+Remove a dataset only when it has no pending or ready queries:
+
+```bash
+near contract call-function as-transaction "$CONTRACT_ACCOUNT" remove_dataset \
+  json-args '{"dataset_id":"<dataset>"}' \
   prepaid-gas '30 Tgas' attached-deposit '0 NEAR' \
   sign-as "$OWNER_ACCOUNT" network-config testnet sign-with-keychain send
 ```
@@ -74,12 +84,14 @@ Read-path load test:
 python3 scripts/load_test.py --requests 10 --concurrency 3
 ```
 
-The state endpoint has a 15-second cache (`SEALQUERY_STATE_TTL_SECONDS`) and falls back to the last successful snapshot during transient RPC failures. The
+The state endpoint has a 15-second cache (`SEALQUERY_STATE_TTL_SECONDS`) and
+falls back to the last successful snapshot during transient RPC failures.
+
 The local 2026-11-09 run with 6 requests and concurrency 3 returned 0 errors
 and p95 `54.9 ms` warm. Hosted runs are slower. A cold state read was `4.15 s`;
-RPC-backed reads are cached
-briefly to avoid public-RPC rate limits. The agent RPC client limits concurrent
-calls with `NEAR_RPC_CONCURRENCY` (default `3`) and retries `429`/`5xx`.
+RPC-backed reads are cached briefly to avoid public-RPC rate limits. The agent
+RPC client limits concurrent calls with `NEAR_RPC_CONCURRENCY` (default `3`) and
+retries `429`/`5xx`.
 
 ## SLOs (testnet scope)
 
@@ -87,10 +99,11 @@ calls with `NEAR_RPC_CONCURRENCY` (default `3`) and retries `429`/`5xx`.
 - Warm state reads: p95 below 1 second.
 - Cold state reads: p95 below 15 seconds.
 - Valid queries with an allowed dataset/computation/params: 100% reach
-  `PROVEN` or fail safely with a refund.
+  `PROVEN`, end in a recorded refund, or become owner-settleable after timeout.
 - Attestation verification: 100% of valid proof bundles verify offline.
-- Failed or timed-out queries: refund recorded within one block of the failure
-  transaction.
+- Failed or pending timed-out queries: refund recorded within one block of the
+  failure transaction. A ready query cannot be refunded; after timeout it can be
+  settled to the owner.
 - No critical monitoring alert is ignored during a demo.
 
 These are testnet targets, not production SLAs.
@@ -114,16 +127,19 @@ These are testnet targets, not production SLAs.
 ### Callback timeout
 
 1. Read the query record with `get_query`.
-2. If it is `failed` or timed out, call `refund_query` as the agent.
+2. If it is `failed` or a pending query has timed out, call `refund_query` as the agent.
 3. Confirm the agent balance and that the query status is `refunded`.
-4. Do not retry the same computation blindly; use a new query ID.
+4. A `ready` result cannot be refunded; let the owner call `settle_query` after the
+   200-block timeout, or accept it from the agent after verification.
+5. Do not retry the same computation blindly; use a new query ID.
 
 ### Refund backlog
 
 1. List recent queries with `get_queries_for_agent`.
-2. Inspect each `get_query` record; refund every failed query once.
+2. Inspect each `get_query` record; refund every failed or pending timed-out query once.
 3. Confirm each refund transaction and agent balance delta.
 4. A repeated refund must fail because the query is no longer refundable.
+5. Do not refund a `ready` query; settle it to the owner after timeout instead.
 
 ### Contract pause and unpause
 
@@ -149,11 +165,14 @@ service restoration. It requires `DRILL_CONFIRM=1` to prevent accidental use.
 3. Deploy and inspect the code hash on-chain.
 4. Run a smoke query and verify the attestation.
 5. Keep the previous WASM and evidence until the new deployment is verified.
+6. There is no state-migration framework yet; avoid incompatible state layouts
+   until a migration path exists.
 
 ### Key rotation
 
 - **Agent key:** create a new agent account/key, fund it, update
-  `AGENT_ACCOUNT`, restart the API, run a smoke query, retire the old key.
+  `AGENT_ACCOUNT` on the worker, restart the worker, run a smoke query, retire
+  the old key. The API does not sign and does not need this key.
 - **API key:** generate a new `SEALQUERY_API_KEY`, restart the API, update MCP
   client configs, then revoke the old value.
 - **OutLayer payment key:** create/top up a new project-scoped key, update the
@@ -165,9 +184,9 @@ service restoration. It requires `DRILL_CONFIRM=1` to prevent accidental use.
 ### API restart or crash
 
 Restart with `./scripts/run_backend.sh` and the required environment. The contract
-remains authoritative. In-memory idempotency and rate-limit state is lost on
-restart; clients should retry with a new idempotency key only after checking the
-query history.
+remains authoritative. Redis holds idempotency and rate-limit state when
+configured; if Redis is unavailable, the in-memory fallback is lost on restart.
+Check query history before retrying with a new idempotency key.
 
 ## Backups and restore
 
@@ -212,7 +231,10 @@ database backup of record.
 ## Open production gaps
 
 - No centralized secret manager or on-call rotation.
-- Idempotency/rate-limit state is in process memory.
+- Idempotency/rate-limit state is in Redis when deployed, with an in-memory local
+  fallback; a Redis outage degrades protection.
 - No full OutLayer outage simulation or paid concurrent-query load test.
-- Public RPC and OutLayer testnet are external dependencies.
+- Public RPC, Neardata, and OutLayer testnet are external dependencies.
 - The demo UI uses the server-side agent key; a human wallet flow is deferred.
+- There is no contract state migration path.
+- Event indexing is rate-limited by public Neardata (`~30 blocks/minute`).

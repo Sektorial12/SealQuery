@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added the SealQuery README banner, web header mark, and favicon.
+- Refreshed README, architecture, operations, security, evidence, and MCP docs
+  for the current contract/API and known limitations.
+- Clarified onboarding, public aggregate results, timeout settlement, compute
+  surplus, and verifier scope in the docs.
+
 ## 0.6.2 — 2026-11-11
 
 - Retried near CLI submissions that fail with an expired transaction before
@@ -73,7 +81,6 @@
 - Pinned backend dependencies and the external verifier revision.
 - Clarified the reproducible build commit for the deployed contract.
 - Exposed the API version on `/api/health`.
-- Updated the API version to 0.5.0.
 
 ## 0.4.0 — 2026-11-10
 

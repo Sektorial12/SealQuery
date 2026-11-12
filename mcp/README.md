@@ -41,7 +41,14 @@ Claude Desktop, Cursor, or another MCP client can launch the server with:
 - `verify_query` — independently re-verify an OutLayer attestation
 
 `run_query` performs a real testnet transaction and a real TEE execution. It
-returns the aggregate result and settlement metadata, never raw rows.
+returns the aggregate result and settlement metadata, never raw rows. In this
+prototype the aggregate is also public on-chain and through the API; it is not
+exclusive to the buyer.
+
+If attestation verification fails, do not call `accept_result`. A ready query
+cannot be refunded; the owner may settle it through the timeout path after 200
+blocks. That timeout path is not proof-gated on-chain and is a documented
+testnet limitation.
 
 ## Smoke test
 

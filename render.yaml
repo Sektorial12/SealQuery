@@ -40,8 +40,6 @@ services:
         value: "15"
       - key: TRUST_PROXY_HEADERS
         value: "1"
-      - key: EVENT_START_BLOCK
-        value: "277135250"
       - key: PROOF_DIR
         value: data/proofs
 
@@ -88,7 +86,7 @@ services:
       - key: EVENT_MAX_LAG_BLOCKS
         value: "10000"
       - key: EVENT_REINDEX
-        value: "1"
+        value: "0"
       - key: PROOF_DIR
         value: data/proofs
 

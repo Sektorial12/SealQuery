@@ -2,7 +2,25 @@
 
 Reproducible evidence for the testnet proof. All values below are from real NEAR testnet and OutLayer testnet activity. No execution, attestation, access-control decision, or payment is mocked.
 
-## Environment
+## Current live deployment
+
+Snapshot: 2026-11-12. This is the deployment to check first; the sections below
+are retained as historical evidence.
+
+- Contract: `contract.sealquery-v2-1794194344.testnet`
+- Contract version: `0.2.3`
+- Contract code SHA-256 (reproducible): `76570dc47a7bee9f5586a455efa7fdfbb71b67ac980972694dc9bd2dbcdb5729`
+- Source commit: `052611e`
+- Deploy transaction: `8Hbter8stSvfjHYgyrE1zVgobTDXoGGXXgfCut14k6bQ`
+- API: https://sealquery-api.onrender.com (`0.6.2`)
+- Web: https://sealquery-web.onrender.com
+- Dataset: `retail_v1`, SHA-256 `65a10103f741129dc4270d267e694e341efd8b3a4b8ebdf06e97d73bc08b1983`
+- Workload: `spend_growth_v1`, SHA-256 `3b1bc4eaabcde79492959f8ac34e47173f11b358ca06b31f1694053494acca47`
+- Last verified hosted query: `49`, task `65996`, `PROVEN`, settled
+- Current demo budget: `12/20`; `paused=false`; 49 queries
+- Tests: 29 contract, 5 workload, 6 backend; CI green
+
+## Original v1 environment (historical)
 
 - Network: NEAR testnet
 - Deployer: `sealquery-1794187176.testnet`
@@ -72,7 +90,7 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Attestation result: `PROVEN task 29129`
 - Proof bundle: `data/upload_proof.json` (local evidence)
 
-## Contract deployment and registration
+## Original v1 contract deployment (historical)
 
 - Initial deploy transaction: `EXD8MBqzVQz9toRGCXQrjmurXtfLR7UqzhMCNAhs8wpq`
 - Current code deploy transaction: `GG7eUiyneH2MNYbPjS3qJ6g3Bd8KovPqB3FjDViTmNfv`
@@ -86,7 +104,7 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Data-owner reward: `0.01 NEAR`
 - Daily privacy budget: 20 queries per agent per dataset
 
-## Multi-tenant contract (v2)
+## v2 contract history and current deployment
 
 - v2 deployer: `sealquery-v2-1794194344.testnet`
 - v2 contract: `contract.sealquery-v2-1794194344.testnet`
@@ -210,6 +228,8 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
 - Protocol fees cannot change after the first query.
 - Dataset registration is contract-owner gated; the duplicate `retail_alt`
   record was removed on-chain.
+- v0.2.3 adds `register_dataset_for` and `transfer_dataset_owner`; a live
+  `onboard_test` dataset was registered for `owner2` and removed.
 - The owner-only `withdraw_contract_balance` method was removed.
 - `reset_budget` is owner-only and used only to restore the testnet demo budget.
 - Added contract tests for ready-query refund rejection, pending/failed refunds,
@@ -235,6 +255,15 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   accept `9XGpTUv25bdQr8rWtjoRCkXmsD6RKV6f8eLcWwSeVxyh`.
 - Browser rate-limit check: 12 rapid constant-XFF invalid requests returned 400
   for the first five and 429 for the rest.
+- Hosted query `45` after the v0.2.3/0.6.2 deploy: task `59970`, `PROVEN`,
+  settled; request `BPGjQ1QXx6RkQgZc3ugpfXo8RgNrRJQVDhkwMHUQca3A`,
+  accept `AVQBFw1wDMD46kfGFYboNQ9tf8Xz71raVSqUXS8JN1sz`.
+- Hosted query `49` after the demo checks: task `65996`, `PROVEN`, settled;
+  request `pVSzbLtsxrqrFrdSx4Lhg7XYvJ6qRJCAQo7n3pFV3va`, accept
+  `HLpfJhskHpikKdduvJn88s9fegBoUXBDkWKATfJo11C2`.
+- Hosted rejected query `48`: `refunded`; request
+  `Ay1S3Azjc5BM8dxr5zwJNjfsk91nze8MeSZ8e8ehHQLa`, refund
+  `94wbFNJ5hKZ3z7k9sqFdt37Kg3bZ2DduWcTXQcdjbHMa`.
 - Ready-result regression on the live v0.2.2 contract: query `37` request
   `Ba6Jw8f22YNXkqS7oCrpLKe8B1XooqyRY6YVTBrsyBjj`; after the callback set it
   `ready`, `refund_query` was rejected with
@@ -244,8 +273,8 @@ Reproducible evidence for the testnet proof. All values below are from real NEAR
   `settled`.
 - Live v0.2.2 state after cleanup (historical): `list_datasets` = `["retail_v1"]`,
   budget `2/20`, `paused=false`.
-- Live v0.2.3 state after query `42`: `list_datasets` = `["retail_v1"]`, budget
-  `5/20`, `paused=false`, 42 queries.
+- Live v0.2.3 state after query `49`: `list_datasets` = `["retail_v1"]`, budget
+  `12/20`, `paused=false`, 49 queries.
 - Post-upgrade async incident drill on v0.5.0 API: job
   `a8929f45227d461ca71d469b3d712deb` failed fast with `contract is paused`;
   pause/unpause finished with `DRILL PASSED`.
@@ -339,6 +368,8 @@ python3 scripts/verify_query.py \
 - Refund query 1 transaction: `DLH2qbG1aBFhq3GTbxZU61J8AwD2CdSRtkzfK9QbADq4`
 - Refund query 2 transaction: `ChM6C5kdymCMj4Sy6m3ZvEip4Sk1fZGdBLAD65E8ubsn`
 - Each refund returned `0.02 NEAR` to the agent.
+- Ready query `37` was rejected for refund after timeout; the owner was paid by
+  `settle_query` transaction `2nVhVTfXKcUuhbxsZa1HaMcEyAm8viBcjzXuDYWmc4Wo`.
 - Agent balance before refunds: `937233287987583900000000` yoctoNEAR
 - Agent balance after refunds: `976749901381819700000000` yoctoNEAR
 
@@ -539,25 +570,25 @@ python3 scripts/verify_query.py \
 
 ## Known limitations
 
-- The dataset is public and used as a private-data stand-in.
-- OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
-- The NEAR callback output is limited to 900 bytes; larger results would require off-chain delivery plus hash settlement.
-- OutLayer execution is limited to 60 seconds by the contract request; the worker waits up to 90 seconds for the callback.
-- The live demo has one owner-gated dataset and one approved computation. Dataset registration is not permissionless; multi-tenant onboarding still needs an owner-proof design.
-- Aggregate results are public on-chain and through the API. Raw rows are not delivered, but results are not exclusive to the buyer.
-- Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
-- Cohort counts are distinct invoices, not distinct people; no differential privacy.
-- Contract state has no migration path yet.
-- The verifier's identity check covers the OutLayer worker measurement. SealQuery does not
-  independently compare the executed application wasm hash in the attestation report to
-  the registered computation; the contract pins the source version in the request.
-- Offline bundle identity relies on unsigned `measurements_approved` metadata in the bundle;
-  online verification checks the chain.
-- Differential privacy and a full marketplace discovery/ordering layer are not implemented.
-- The demo API is a single FastAPI process; Redis backs idempotency/rate limits when deployed, with an in-memory local fallback.
-- No central secret manager, on-call routing, or production dashboards are implemented.
-- Paid concurrent-query load and a full OutLayer outage simulation are not run.
-- Historical event backfill is optional because of the public Neardata rate limit; incremental events and polling history cover the demo.
-- The UI uses the server-side demo agent; a human wallet connection is deferred.
-- The browser query endpoint is allowlisted to configured demo datasets but remains key-free and can spend within the agent budget.
-- Cross-chain payments and NEAR Intents are intentionally out of scope.
+- The dataset is public UCI Online Retail data used as a private-data stand-in.
+- Aggregate results are public on-chain and through the API; raw rows are never delivered, but the answer is not exclusive to the buyer.
+- No differential privacy, sybil resistance, or cross-account privacy budget is implemented.
+- Cohort counts are distinct invoices, not distinct people.
+- The demo has one live owner-gated dataset and one approved computation. The
+  contract owner can onboard another owner with `register_dataset_for`; there is
+  no independent owner-proof or permissionless allowlist.
+- A ready query cannot be refunded; after the 200-block timeout anyone may settle
+  it to the owner. That timeout path is not proof-gated on-chain and is disclosed.
+- The verifier checks the OutLayer worker measurement and task binding, not an
+  independently registered application wasm hash. Offline bundle identity relies
+  on unsigned `measurements_approved` metadata.
+- Unused OutLayer compute refunds accumulate in the contract; there is no agent
+  withdrawal path yet.
+- The contract has no state-migration path. Economics changes are blocked after
+  the first query, so the reward is stable but not snapshotted per query.
+- Public Neardata is limited to roughly 30 blocks/minute, so event indexing can lag.
+- The API is a single FastAPI process; Redis backs idempotency/rate limits when
+  deployed, with an in-memory fallback. There is no central secret manager or
+  on-call rotation.
+- OutLayer governance is centralized; the TEE proves what ran, not semantic correctness.
+- Cross-chain payments and NEAR Intents are out of scope.

@@ -25,7 +25,8 @@ without receiving the raw rows.
 ```
 
 `run_query` returns an aggregate result plus `tx_hash`, `accept_tx`, `proof`,
-and `owner_after`. It never returns raw dataset rows.
+and `owner_after`. It never returns raw dataset rows. In this prototype the
+aggregate is public on-chain and through the API.
 
 ## Failure handling
 

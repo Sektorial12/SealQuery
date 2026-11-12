@@ -15,9 +15,11 @@ is assumed, and what remains unsolved. It is not a production security audit.
 
 ## Actors
 
-- **Data owner:** registers datasets and approved computations.
+- **Data owner:** controls an onboarded dataset and its approved computations.
 - **Agent:** pays for and requests an approved computation.
-- **Contract owner:** pause, fee, and protocol configuration.
+- **Contract owner:** pause, fee, protocol configuration, dataset onboarding,
+  ownership transfer, and demo budget resets. Registration is allowlisted through
+  this account; there is no independent owner-proof yet.
 - **OutLayer:** runs the TEE workload and publishes execution proofs.
 - **NEAR:** executes the contract and callback.
 - **Verifier:** runs `outlayer-verify` and checks proof bundles.
@@ -105,9 +107,14 @@ This is a known gap for a production deployment.
 
 - **Threat:** an agent pays but receives no result, or a failed query is not
   refunded.
-- **Present:** escrow, explicit `refund_query`, failure tests, and evidence of
-  refunds. Paused contracts reject new queries.
-- **Residual:** transaction fees are not refunded; retry loops can cost gas.
+- **Present:** escrow, explicit `refund_query` for failed and pending timed-out
+  queries, failure tests, and evidence of refunds. A ready query cannot be
+  refunded; after the 200-block timeout anyone may call `settle_query` to pay the
+  owner. Paused contracts reject new queries.
+- **Residual:** the timeout settlement path is not proof-gated on-chain. The
+  agent verifies the happy path; the contract does not verify TDX quotes.
+  Transaction fees are not refunded; retry loops can cost gas. Unused OutLayer
+  compute remains in the contract and has no agent withdrawal path yet.
 
 ### Key compromise
 
@@ -124,19 +131,20 @@ This is a known gap for a production deployment.
 - **Threat:** a data owner or operator swaps the dataset behind a registered
   hash.
 - **Present:** dataset hashes are registered and checked by the workload;
-  registration is contract-owner gated, so a different account cannot create a
-  new owner record for an existing dataset;
-  rotation is owner-controlled and logged.
+  registration is contract-owner gated, and `register_dataset_for` /
+  `transfer_dataset_owner` let the contract owner onboard a named owner;
+  rotation is owner-controlled and logged. There is no independent owner-proof
+  or permissionless allowlist yet.
 - **Residual:** there is no historical version registry; the active version is
   the source of truth.
 
 ### Availability and denial of service
 
 - **Threat:** public RPC rate limits, OutLayer outage, API crash, or query spam.
-- **Present:** RPC semaphore/retries, state caching, API rate limit, refunds,
-  pause, and monitoring.
-- **Residual:** single-process API, in-memory limits, external testnet
-  dependencies, no on-call rotation.
+- **Present:** RPC semaphore/retries, state caching, a global browser-query
+  limiter plus a per-caller limit, refunds, pause, and monitoring.
+- **Residual:** single-process API, Redis/in-memory limits, external testnet
+  dependencies, no on-call rotation, and a public Neardata rate limit.
 
 ## Privacy review
 
@@ -148,6 +156,7 @@ This is a known gap for a production deployment.
   Differential privacy is not implemented.
 - A real deployment needs a data-processing agreement, licensing review, DPIA,
   retention policy, and incident notification process.
+- Contract upgrades have no state-migration framework yet.
 
 ## Independent verification
 

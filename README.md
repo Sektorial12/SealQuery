@@ -2,11 +2,52 @@
   <img src="docs/assets/sealquery-banner.webp" alt="SealQuery — sell the answer, not the dataset" width="100%" />
 </p>
 
-# SealQuery
+<h1 align="center">SealQuery</h1>
 
-SealQuery lets AI agents pay to execute approved computations against privately held datasets without receiving the raw data.
+<p align="center"><strong>Sell the answer, not the dataset.</strong></p>
 
-A data owner registers a dataset and the computations it permits. An agent requests one approved computation and pays for execution. The computation runs inside a trusted execution environment. The agent receives an attested result; the data owner receives payment. The raw data is never delivered to the agent.
+<p align="center">
+  <a href="https://sealquery-web.onrender.com"><img alt="Live testnet demo" src="https://img.shields.io/badge/demo-live-6ef2c8?style=flat-square" /></a>
+  <a href="https://github.com/Sektorial12/SealQuery/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sektorial12/SealQuery/actions/workflows/ci.yml/badge.svg" /></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-7cc7ff?style=flat-square" />
+  <img alt="NEAR testnet" src="https://img.shields.io/badge/network-NEAR%20testnet-6ef2c8?style=flat-square" />
+  <img alt="Contract 0.2.3" src="https://img.shields.io/badge/contract-0.2.3-8c9cb0?style=flat-square" />
+</p>
+
+<p align="center"><sub>Built at NEAR HACKATHON · testnet prototype</sub></p>
+
+**Live demo:** https://sealquery-web.onrender.com<br />
+**Contract:** `contract.sealquery-v2-1794194344.testnet` (v0.2.3)<br />
+**API:** https://sealquery-api.onrender.com (v0.6.2)
+**Docs:** [architecture](docs/architecture.md) · [evidence](docs/evidence.md) · [operations](docs/operations.md) · [threat model](docs/threat-model.md)
+
+SealQuery lets AI agents pay to execute approved computations against privately held datasets without receiving the raw data. A data owner registers a dataset and the computations it permits. An agent requests one approved computation and pays for execution. The computation runs inside a trusted execution environment. The agent receives an attested result; the data owner receives payment. The raw data is never delivered to the agent.
+
+## Try it in 60 seconds
+
+1. Open the [live app](https://sealquery-web.onrender.com/app) and click **Run query**.
+2. Watch the job move from queued to settled; open the result and the attestation card.
+3. Click **Test rejected query** to see the workload refuse the request and refund the agent.
+
+No wallet is needed. This is a testnet prototype.
+
+## Contents
+
+- [The problem](#the-problem)
+- [What was built](#what-was-built)
+- [How NEAR is used](#how-near-is-used)
+- [Repository layout](#repository-layout)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Web app](#web-app)
+- [API](#api)
+- [MCP](#mcp)
+- [Operations](#operations)
+- [Registry and controls](#registry-and-controls)
+- [Payment flow](#payment-flow)
+- [Privacy controls](#privacy-controls)
+- [Test evidence](#test-evidence)
+- [Known limitations](#known-limitations)
 
 ## The problem
 
@@ -18,13 +59,13 @@ SealQuery sells the answer, not the dataset. The data owner keeps the raw data; 
 
 A working NEAR testnet proof with no mocked execution, attestation, access control, or payment:
 
-- A real private dataset stored in OutLayer encrypted worker storage.
+- A deterministic dataset stored in OutLayer encrypted worker storage (public UCI source used as a private-data stand-in).
 - One approved computation running in Intel TDX on OutLayer testnet.
-- A dataset-registry NEAR contract (v2) that escrows payment, calls OutLayer, receives the result, and settles to the dataset owner. Registration is contract-owner gated; existing owners control their computations and economics.
+- A dataset-registry NEAR contract (v2) that escrows payment, calls OutLayer, receives the result, and settles to the dataset owner. Registration is contract-owner gated; `register_dataset_for` and `transfer_dataset_owner` let the contract owner onboard a distinct owner.
 - An agent client that quotes, pays, waits, verifies the TEE attestation, and accepts the result.
 - A per-dataset privacy budget (20 by default), minimum cohort of 100, output rounding, and a canary row that never appears in results.
 - Dataset-scoped controls: versions and rotation, pause, per-dataset pricing/budgets, protocol fees, and query history.
-- Contract tests cover budget exhaustion, pause, unauthorized acceptance, replay, duplicate computations, economics, late callbacks, ready-result refund rejection, owner settlement after timeout, and failed/pending refunds.
+- 29 contract tests cover budget exhaustion, pause, unauthorized acceptance, replay, duplicate computations, economics, late callbacks, ready-result refund rejection, owner settlement after timeout, owner onboarding/transfer, and failed/pending refunds.
 - Manual negative-path evidence covers unauthorized computations, direct OutLayer calls, and tampered attestations.
 - A Next.js product app, FastAPI/Postgres/Redis API, async query worker, refund reconciler, event indexer, owner earnings, readiness/metrics, and Docker Compose + Render deployment.
 - Reproducible contract build, CI, deploy scripts, and clean-clone verification with a real query.
@@ -36,26 +77,26 @@ A working NEAR testnet proof with no mocked execution, attestation, access contr
 - **Execution request:** the contract calls `outlayer.testnet::request_execution`.
 - **Callback:** OutLayer resumes the NEAR yield and the contract receives the TEE result.
 - **Settlement:** the agent verifies the attestation and calls `accept_result`; the contract pays the data owner.
-- **Refunds:** failed or timed-out queries are refunded to the agent.
+- **Refunds:** failed or pending timed-out queries are refunded to the agent. Ready queries can be settled to the owner after timeout.
 - **Privacy budget:** enforced by the contract before the OutLayer call.
 
 OutLayer provides Intel TDX execution and per-execution attestations. NEAR provides the ownership, escrow, callback, and settlement layer.
 
 ## Repository layout
 
-```
-contracts/sealquery/   NEAR contract
-workload/              probe and approved WASI computation
-agent/                 agent client
-backend/               FastAPI service, worker, indexer, Postgres models
-frontend/              Next.js product web app
-mcp/                   MCP stdio server
-compose.yaml           Next.js + FastAPI + Postgres + Redis + Caddy
-render.yaml            Render hosted mirror (Neon + Upstash)
-Caddyfile              Compose reverse proxy
-scripts/               dataset preparation, query verification, smoke tests
-docs/                  architecture, evidence, operations, threat model
-```
+| Path | Purpose |
+|---|---|
+| `contracts/sealquery/` | NEAR registry, escrow, callback, settlement, and refunds |
+| `workload/` | Approved WASI computation and probe workload |
+| `agent/` | Agent client: quote, pay, verify, accept/refund |
+| `backend/` | FastAPI service, async worker, refund reconciler, event indexer, PostgreSQL models |
+| `frontend/` | Next.js product app |
+| `mcp/` | MCP stdio server |
+| `scripts/` | Dataset, deploy, verification, monitoring, and demo tools |
+| `docs/` | Architecture, evidence, operations, threat model, and brand assets |
+| `.github/` | CI, issue templates, and PR template |
+| `compose.yaml` | Canonical self-host stack with Caddy, Postgres, and Redis |
+| `render.yaml` | Hosted Render mirror using Neon and Upstash |
 
 ## Requirements
 
@@ -72,7 +113,7 @@ docs/                  architecture, evidence, operations, threat model
 - Python packages: `backend/requirements.txt`
 - NEAR testnet accounts: deployer, contract, data owner, agent
 - OutLayer testnet login and a project-restricted payment key
-- On hosts without the NEAR keychain, set `NEAR_ACCESS_KEY_FILE` to a mounted JSON access-key file
+- On hosts without the NEAR keychain, set `NEAR_ACCESS_KEY_FILE` on the worker to a mounted JSON access-key file
 
 ## Quick start
 
@@ -97,20 +138,6 @@ cargo test -p sealquery-workload
 ```
 
 Expected: `5 passed`.
-
-### Reproducible build
-
-The deployed artifact was built from commit `052611e`. Check out that commit
-first for a bit-identical hash; later commits change only the embedded source
-snapshot metadata.
-
-```bash
-git checkout 052611e
-cd contracts/sealquery
-cargo near build reproducible-wasm
-```
-
-Expected v0.2.3 contract hash: `76570dc47a7bee9f5586a455efa7fdfbb71b67ac980972694dc9bd2dbcdb5729`, built from commit `052611e`. CI runs format, clippy, tests, workload build, contract build, and the secret scan.
 
 ### 3. Build the approved workload
 
@@ -208,6 +235,10 @@ Expected verifier result: `PROVEN`.
 ### 7. Build and deploy the contract
 
 ```bash
+# Fresh contract: INIT=1. Upgrade an existing contract: INIT=0.
+INIT=1 ./scripts/deploy_all.sh
+
+# Or deploy manually:
 cargo near build non-reproducible-wasm --locked --no-abi
 
 near contract deploy '<contract>' \
@@ -218,8 +249,21 @@ near contract deploy '<contract>' \
   network-config testnet sign-with-keychain send
 ```
 
-### 8. Register the dataset and computation
+### 8. Verify the pinned contract build (optional)
 
+The deployed artifact was built from commit `052611e`. Check out that commit
+first for a bit-identical hash; later commits change only the embedded source
+snapshot metadata.
+
+```bash
+git checkout 052611e
+cd contracts/sealquery
+cargo near build reproducible-wasm
+```
+
+Expected v0.2.3 contract hash: `76570dc47a7bee9f5586a455efa7fdfbb71b67ac980972694dc9bd2dbcdb5729`, built from commit `052611e`.
+
+### 9. Register the dataset and computation
 ```bash
 near contract call-function as-transaction '<contract>' register_dataset \
   json-args '{
@@ -249,7 +293,13 @@ near contract call-function as-transaction '<contract>' register_computation \
   sign-as '<data-owner>' network-config testnet sign-with-keychain send
 ```
 
-### 9. Run the agent
+For a different data owner, the contract owner can call `register_dataset_for`
+with the same fields as `register_dataset` plus an `owner` argument. Use
+`transfer_dataset_owner` to move an existing dataset; the dataset owner or
+contract owner can sign the transfer. The live `onboard_test` proof is recorded
+in [`docs/evidence.md`](docs/evidence.md).
+
+### 10. Run the agent
 
 Create `data/agent_params.json`:
 
@@ -279,7 +329,7 @@ settled
 
 The result is an aggregate spend growth, not raw rows. The data owner receives `0.01 NEAR`.
 
-### 10. Verify independently
+### 11. Verify independently
 
 ```bash
 python3 scripts/verify_query.py \
@@ -349,7 +399,9 @@ API endpoints:
 - `GET /metrics` — Prometheus gauges
 
 Set `SEALQUERY_API_KEY` before starting the service to require an API key on the
-machine endpoint. The browser endpoint stays same-origin and key-free.
+machine endpoint. The browser endpoint stays same-origin and key-free; it is
+dataset-allowlisted, uses a global demo limiter plus a per-caller limiter, and is
+bounded by the contract's daily budget.
 
 ```bash
 export SEALQUERY_API_KEY='<local-demo-key>'
@@ -429,9 +481,18 @@ python3 scripts/demo_flow.py \
   --api-key "$SEALQUERY_API_KEY"
 ```
 
-## Multi-tenant controls
+## Registry and controls
 
 ```bash
+# Onboarding: call register_dataset_for with the same fields as register_dataset
+# plus an `owner` argument. Contract owner only. See the contract ABI/tests.
+
+# Transfer an existing dataset to another owner
+near contract call-function as-transaction '<contract>' transfer_dataset_owner \
+  json-args '{"dataset_id":"retail_v1","new_owner":"<new-owner>"}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' \
+  sign-as '<dataset-owner>' network-config testnet sign-with-keychain send
+
 # Rotate a dataset to a new version and hash
 near contract call-function as-transaction '<contract>' rotate_dataset \
   json-args '{"dataset_id":"retail_v1","new_version":"retail_v2","new_data_hash":"<new hash>"}' \
@@ -456,10 +517,10 @@ near contract call-function as-read-only '<contract>' get_queries_for_agent \
 ## Payment flow
 
 - Agent pays `0.02 NEAR` to the contract.
-- Contract attaches `0.01 NEAR` to OutLayer for compute.
-- OutLayer charges actual compute and refunds the unused amount to the contract.
-- On acceptance, the contract pays the data owner `0.01 NEAR`.
-- On failure or timeout, the agent can call `refund_query` and receive `0.02 NEAR`.
+- Contract attaches `0.01 NEAR` to OutLayer as a compute deposit. OutLayer charges actual compute and returns the unused amount to the contract; the unused compute is not yet withdrawable by the agent.
+- On acceptance, the contract pays the data owner `0.01 NEAR` (minus the protocol fee).
+- A failed or pending timed-out query can be refunded to the agent with `refund_query`.
+- A `ready` result cannot be refunded. After the 200-block timeout, anyone can call `settle_query` to pay the owner; that timeout path is not proof-gated on-chain and is disclosed on the security page.
 
 ## Privacy controls
 
@@ -474,58 +535,43 @@ near contract call-function as-read-only '<contract>' get_queries_for_agent \
 
 ## Test evidence
 
-See `docs/evidence.md` for transaction hashes, task IDs, attestation results, balances, and negative-test output.
+The full transaction, task, balance, and negative-test log is in [`docs/evidence.md`](docs/evidence.md). Current testnet snapshot (2026-11-12):
 
-Highlights:
+| Check | Evidence |
+|---|---|
+| Contract | `v0.2.3`, hash `76570dc4…b5729`, deploy `8Hbter…k6bQ` |
+| Workload | `3b1bc4ea…acca47` |
+| Dataset | `65a10103…b1983`, 5,001 rows including one canary |
+| Hosted accepted query | query `49`, task `65996`, `PROVEN`, settled |
+| Live state | `12/20` demo budget, `paused=false`, 49 queries |
+| Hosted rejected path | query `48` refunded by tx `94wb…bHMa` |
+| TDX proof | all five checks pass, TCB `UpToDate`; bundle verifies offline |
+| Ready-result regression | refund rejected; owner settled after timeout |
+| Tests | 29 contract, 5 workload, 6 backend |
+| CI | format, clippy, tests, builds, and secret scan |
+| Monitoring | readiness, metrics, heartbeats, backups, and incident drill |
 
-- Dataset upload: OutLayer task `29129`, `PROVEN`.
-- Approved computation: OutLayer task `29136`, `PROVEN`.
-- Manual end-to-end query: task `29143`, `PROVEN`, payout `0.01 NEAR`.
-- Automated agent query: task `29145`, `PROVEN`, settled.
-- Refunds: queries 1 and 2 returned `0.02 NEAR` each.
-- Direct OutLayer call: denied by the secret access condition.
-- Replay and unauthorized acceptance: rejected.
-- Tampered proof: `NOT PROVEN`.
-- Privacy budget: 20 queries allowed; 21st rejected with `daily privacy budget exceeded`.
-- Authenticated machine query: task `30169`, `PROVEN`, idempotent replay verified.
-- MCP query: task `30170`, `PROVEN`, all five MCP tools exercised.
-- Attestation report: all five checks pass, TCB `UpToDate`; saved bundle verifies offline.
-- Rejected-query path: query 8 failed safely and refunded the agent.
-- Monitoring: `/api/metrics` reported no critical alerts; `monitor.py --once` exited `0`.
-- Local load test: 6 state reads at concurrency 3, 0 errors, p95 `54.9 ms` warm (hosted RPC state reads are slower).
-- Incident drill: pause, rejected query, and unpause all verified; `DRILL PASSED`.
-- Hosted async query `25`: task `31808`, `PROVEN`, settled; hosted event indexer and owner summary verified.
-- Hardened contract v0.2.2: ready results cannot be refunded; the owner can settle a timed-out ready query; protocol fees freeze after the first query; late callbacks cannot overwrite final queries.
-- v0.2.3 adds contract-owner onboarding with `register_dataset_for` and `transfer_dataset_owner`; a live `onboard_test` dataset was registered for a second owner and removed.
-- Hosted async query `32` after the first contract upgrade: task `41071`, `PROVEN`, settled.
-- The synthetic `retail_alt` copy was removed on-chain; the live demo now has one owner-gated dataset, and its budget was reset for judging.
-- Hosted async query `36` after the v0.2.2 upgrade: task `45967`, `PROVEN`, settled.
-- Hosted async query `38` after funding the demo agent: task `47539`, `PROVEN`, settled.
-- Hosted async query `39` after output-binding checks: task `48761`, `PROVEN`, settled.
-- Hosted async query `42` after the v0.2.3/0.6.0 deploy: task `51098`, `PROVEN`, settled; the demo browser limiter returned 429 after the quota.
-- Live ready-result regression: query `37` was left ready; `refund_query` was rejected with `ready query must be settled, not refunded`, then `settle_query` paid the owner after timeout.
-- Readiness, Prometheus metrics, worker/indexer heartbeats, and PostgreSQL backup scripts verified.
+Historical evidence remains in the log, including the original v1 proof, the
+v2 migration, the `retail_alt` removal, and the owner-onboarding test.
 
 ## Known limitations
 
-- The dataset is public and used as a private-data stand-in.
-- OutLayer currently holds centralized governance keys; the TEE proves what ran, not that the approved build is honest.
-- The NEAR callback result is limited to about 900 bytes; larger results would require off-chain delivery plus hash settlement.
-- OutLayer execution is limited to 60 seconds by the contract request; the worker waits up to 90 seconds for the callback.
-- One live demo dataset. The contract supports multiple datasets, but registration is contract-owner gated to prevent copying an existing hash/version under another owner.
-- Differential privacy and a full marketplace discovery/ordering layer are not implemented.
-- Cross-chain payments and NEAR Intents are intentionally out of scope.
-- The demo API is a single FastAPI process; Redis holds idempotency and rate-limit state when deployed, and in-memory fallback is used locally.
-- Public Neardata is limited to about 30 blocks/minute, so recent event indexing can lag; query polling and the DB still cover the demo.
-- The browser query endpoint is allowlisted to the configured demo datasets but remains key-free; it can still spend within the agent’s testnet budget, and the UI disables the action when the daily budget is exhausted.
-- Paid aggregate results are public on-chain and through the API; raw rows are never delivered. The UI labels this explicitly.
+- The dataset is public UCI Online Retail data used as a private-data stand-in.
+- The aggregate result is public on-chain and through the API. The raw rows are never delivered, but the answer is not exclusive to the buyer.
+- There is no differential privacy, sybil resistance, or cross-account privacy budget. Budget, cohort, rounding, and the canary are the current controls.
+- Cohort counts are distinct invoices, not distinct people.
+- Dataset registration is contract-owner gated. The contract owner can onboard another owner with `register_dataset_for`; there is no independent owner-proof or permissionless allowlist.
+- There is one live dataset and one approved computation. The contract supports multiple datasets, but the marketplace/discovery layer is not built.
+- The timeout settlement path is permissionless and not proof-gated on-chain. The agent verifies the happy path; the security page and threat model disclose the timeout gap.
+- The verifier checks the OutLayer worker measurement and task binding. SealQuery does not independently compare the executed application wasm hash in the report to the registered computation; offline bundle identity depends on unsigned bundle metadata.
 - Unused OutLayer compute refunds accumulate in the contract; there is no agent withdrawal path yet.
-- The cohort is distinct invoices, not distinct people. No differential privacy.
-- Contract state has no migration path yet.
-- Economics changes are blocked once a dataset has queries; queries do not store a per-query reward snapshot.
-- Dataset registration is contract-owner gated. The contract owner can onboard another owner with `register_dataset_for`, but there is no independent owner-proof or permissionless allowlist yet. A live onboarding/removal test used `onboard_test`.
-- Monitoring, runbooks, and the incident drill are testnet-scope; no central secret manager or on-call rotation is implemented.
-- The TEE does not guarantee correctness; it proves which WASM ran on which input and output.
+- Contract state has no migration path yet. Economics changes are blocked once a dataset has queries, so the reward is stable but not snapshotted per query.
+- Public Neardata is limited to about 30 blocks/minute, so recent event indexing can lag. Query polling and the DB still cover the demo.
+- The browser query endpoint is key-free and allowlisted to the configured dataset; it is globally and per-caller rate-limited, and the UI disables it when the daily budget is exhausted.
+- The API is a single FastAPI process. Redis backs idempotency and rate limits when deployed, with an in-memory local fallback. There is no central secret manager, on-call rotation, or production incident process.
+- OutLayer governance is centralized. The TEE proves which WASM ran on which input/output, not that the computation is semantically correct.
+- OutLayer execution is limited to 60 seconds by the contract request; the worker waits up to 90 seconds for the callback.
+- Cross-chain payments and NEAR Intents are intentionally out of scope.
 
 ## Third-party components
 
@@ -539,7 +585,6 @@ Highlights:
 ## License
 
 MIT. See `LICENSE`.
-
 
 ## Contributing
 
